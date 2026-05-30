@@ -20,6 +20,18 @@ function enginePath(engineId) {
   return `engines.${engineId}`;
 }
 
+function engineEnabledConditions(engine) {
+  const conditions = [{ [enginePath(engine.id)]: true }];
+  if (engine.legacyField) conditions.push({ [engine.legacyField]: true });
+  return conditions;
+}
+
+function engineEnabledUpdate(engine, enabled) {
+  const update = { [enginePath(engine.id)]: enabled };
+  if (engine.legacyField) update[engine.legacyField] = enabled;
+  return update;
+}
+
 function normalizeTokenDocument(document) {
   if (!document) return document;
   const token = { ...document };
@@ -97,10 +109,7 @@ async function getEngineTokens(engineId) {
 
     const query = {
       status: { $ne: 'disabled' },
-      $or: [
-        { [enginePath(engine.id)]: true },
-        { [engine.legacyField]: true },
-      ],
+      $or: engineEnabledConditions(engine),
     };
 
     const tokens = await Token.find(query).select('token').sort({ createdAt: 1 }).lean();
@@ -118,10 +127,7 @@ async function getAccountsByEngine(engineId) {
     if (!engine) throw new Error(`Unknown engine: ${engineId}`);
 
     const tokens = await Token.find({
-      $or: [
-        { [enginePath(engine.id)]: true },
-        { [engine.legacyField]: true },
-      ],
+      $or: engineEnabledConditions(engine),
     }).sort({ createdAt: 1, name: 1 }).lean();
 
     return tokens.map(normalizeTokenDocument);
@@ -141,10 +147,7 @@ async function setEngineEnabled(token, fieldOrEngineId, enabled) {
   if (!engine) throw new Error(`Unknown engine: ${fieldOrEngineId}`);
 
   const update = {
-    $set: {
-      [enginePath(engine.id)]: enabled,
-      [engine.legacyField]: enabled,
-    },
+    $set: engineEnabledUpdate(engine, enabled),
   };
 
   const updatedToken = await Token.findOneAndUpdate({ token: cleanToken }, update, { new: true, runValidators: true }).lean();

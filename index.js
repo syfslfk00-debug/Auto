@@ -6,6 +6,7 @@ const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const { clientId, guildId } = require('./config.json');
 const { connectDatabase } = require('./handlers/database');
+const engineRuntime = require('./services/engineRuntime');
 
 const token = process.env.TOKEN;
 
@@ -86,11 +87,7 @@ async function startApplication() {
         console.error(error);
     }
 
-    fs.readdirSync('./bots').forEach(file => {
-        if (file.endsWith('.js')) {
-            require(`./bots/${file}`);
-        }
-    });
+    await engineRuntime.startAllEngines();
 
     await client.login(token);
 }

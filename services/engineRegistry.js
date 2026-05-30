@@ -16,7 +16,7 @@ const engines = [
 ];
 
 const engineMap = new Map(engines.map(engine => [engine.id, engine]));
-const legacyFieldMap = new Map(engines.map(engine => [engine.legacyField, engine]));
+const legacyFieldMap = new Map(engines.filter(engine => engine.legacyField).map(engine => [engine.legacyField, engine]));
 
 function getEngines() {
   return engines.map(engine => ({ ...engine }));

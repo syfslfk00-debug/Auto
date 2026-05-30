@@ -16,9 +16,12 @@ const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     client.commands.set(command.data.name, command);
+    if (Array.isArray(command.aliases)) {
+        for (const alias of command.aliases) client.commands.set(alias, command);
+    }
 }
 
-const commands = client.commands.map(command => command.data.toJSON());
+const commands = [...new Set(client.commands.map(command => command))].map(command => command.data.toJSON());
 
 const eventsFolder = './events';
 const eventFiles = fs.readdirSync(eventsFolder).filter(file => file.endsWith('.js'));
@@ -32,7 +35,7 @@ for (const file of eventFiles) {
 }
 
 client.once('ready', async () => {
-  console.log('Logged as ' + client.user.tag);
+  console.log('تم تسجيل الدخول باسم ' + client.user.tag);
 });
 
 client.on('interactionCreate', async interaction => {
@@ -46,7 +49,7 @@ client.on('interactionCreate', async interaction => {
 		await command.execute(interaction);
 	} catch (error) {
 		console.error(error);
-		await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+		await interaction.reply({ content: 'حدث خطأ أثناء تنفيذ هذا الأمر.', ephemeral: true });
 	}
 });
 
@@ -66,19 +69,19 @@ async function startApplication() {
     await connectDatabase();
 
     if (!token) {
-        console.error('TOKEN environment variable is missing. Discord bot login was skipped.');
+        console.error('متغير بيئة رمز البوت مفقود. تم تخطي تسجيل الدخول.');
         return;
     }
 
     const rest = new REST({ version: '9' }).setToken(token);
 
     try {
-    console.log('Started refreshing application (/) commands.');
+    console.log('بدأ تحديث أوامر التطبيق.');
         await rest.put(
             Routes.applicationGuildCommands(clientId, guildId),
             { body: commands },
         );
-    console.log('Successfully reloaded application (/) commands.');
+    console.log('تم تحديث أوامر التطبيق بنجاح.');
     } catch (error) {
         console.error(error);
     }
@@ -93,5 +96,5 @@ async function startApplication() {
 }
 
 startApplication().catch(error => {
-    console.error('Failed to start application:', error);
+    console.error('فشل بدء التطبيق:', error);
 });

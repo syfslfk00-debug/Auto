@@ -138,9 +138,10 @@ module.exports = {
       .addIntegerOption(option => option.setName('الصفحة').setDescription('رقم الصفحة').setRequired(false)))
     .addSubcommand(subcommand => addLogFilterOptions(subcommand.setName('حذف-سجلات').setDescription('حذف سجلات يدويًا'))
       .addIntegerOption(option => option.setName('العمر').setDescription('أقدم من عدد أيام').setRequired(false)))
-    .addSubcommand(subcommand => addLogFilterOptions(subcommand.setName('تنظيف-سجلات').setDescription('أرشفة أو حذف سجلات قديمة'))
-      .addIntegerOption(option => option.setName('العمر').setDescription('أقدم من عدد أيام').setRequired(true))
-      .addStringOption(option => option.setName('الوضع').setDescription('أرشفة أو حذف').setRequired(false)))
+    .addSubcommand(subcommand => addLogFilterOptions(
+      subcommand.setName('تنظيف-سجلات').setDescription('أرشفة أو حذف سجلات قديمة')
+        .addIntegerOption(option => option.setName('العمر').setDescription('أقدم من عدد أيام').setRequired(true))
+    ).addStringOption(option => option.setName('الوضع').setDescription('أرشفة أو حذف').setRequired(false)))
     .addSubcommand(subcommand => subcommand.setName('سياسة-السجلات').setDescription('عرض أو تعديل سياسة الاحتفاظ بالسجلات')
       .addStringOption(option => option.setName('المستوى').setDescription('مستوى السجل').setRequired(false))
       .addIntegerOption(option => option.setName('الايام').setDescription('عدد أيام الاحتفاظ').setRequired(false)))

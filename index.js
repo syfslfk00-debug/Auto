@@ -4,7 +4,10 @@ const client = new Client({ intents: ['GUILDS', 'GUILD_MEMBERS', 'GUILD_MESSAGES
 const fs = require('fs');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
-const { token, clientId, guildId } = require('./config.json');
+const { clientId, guildId } = require('./config.json');
+const { connectDatabase } = require('./handlers/database');
+
+const token = process.env.TOKEN;
 
 client.commands = new Collection();
 
@@ -16,21 +19,6 @@ for (const file of commandFiles) {
 }
 
 const commands = client.commands.map(command => command.data.toJSON());
-
-const rest = new REST({ version: '9' }).setToken(token);
-
-(async () => {
-    try {
-    console.log('Started refreshing application (/) commands.');
-        await rest.put(
-            Routes.applicationGuildCommands(clientId, guildId),
-            { body: commands },
-        );
-    console.log('Successfully reloaded application (/) commands.');
-    } catch (error) {
-        console.error(error);
-    }
-})();
 
 const eventsFolder = './events';
 const eventFiles = fs.readdirSync(eventsFolder).filter(file => file.endsWith('.js'));
@@ -62,12 +50,6 @@ client.on('interactionCreate', async interaction => {
 	}
 });
 
-fs.readdirSync('./bots').forEach(file => {
-    if (file.endsWith('.js')) {
-        require(`./bots/${file}`);
-    }
-});
-
 client.on('unhandledRejection', (reason, promise) => {
   return;
 });
@@ -80,4 +62,36 @@ process.on('unhandledRejection', (reason, promise) => {
   return;
 });
 
-client.login(token);
+async function startApplication() {
+    await connectDatabase();
+
+    if (!token) {
+        console.error('TOKEN environment variable is missing. Discord bot login was skipped.');
+        return;
+    }
+
+    const rest = new REST({ version: '9' }).setToken(token);
+
+    try {
+    console.log('Started refreshing application (/) commands.');
+        await rest.put(
+            Routes.applicationGuildCommands(clientId, guildId),
+            { body: commands },
+        );
+    console.log('Successfully reloaded application (/) commands.');
+    } catch (error) {
+        console.error(error);
+    }
+
+    fs.readdirSync('./bots').forEach(file => {
+        if (file.endsWith('.js')) {
+            require(`./bots/${file}`);
+        }
+    });
+
+    await client.login(token);
+}
+
+startApplication().catch(error => {
+    console.error('Failed to start application:', error);
+});

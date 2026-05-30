@@ -1,8 +1,7 @@
 const { Client } = require('discord.js-selfbot-v13');
 const path = require('path');
 const fs = require('fs');
-const { QuantumDB } = require('qd.db');
-const db = new QuantumDB('replka-tokens.json');
+const tokenService = require('../services/tokenService');
 const activeClients = new Map();
 
 async function stopAllTokens() {
@@ -19,7 +18,7 @@ async function stopAllTokens() {
 
 async function startTokens() {
   try {
-    const tokens = await db.get('tokens') || [];
+    const tokens = await tokenService.getReplkaTokens();
      for (const token of tokens) {
        try {
     const client = new Client(); 

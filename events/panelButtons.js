@@ -1,10 +1,7 @@
 const { MessageActionRow, MessageSelectMenu } = require('discord.js');
 const path = require('path');
 const { na3san } = require('../config.json');
-const { QuantumDB } = require('qd.db');
-const aTokens = new QuantumDB('tokens.json');
-const rTokens = new QuantumDB('replka-tokens.json');
-const kTokens = new QuantumDB('karasi-tokens.json');
+const tokenService = require('../services/tokenService');
 
 module.exports = {
     name: 'interactionCreate',
@@ -13,7 +10,7 @@ module.exports = {
       if (['replkaS', 'replkaO', 'karasiS', 'karasiO'].includes(interaction.customId)) {
        if (!na3san.includes(interaction.user.id)) return interaction.reply({ content: 'You are not allowed to use this button!', ephemeral: true });
         const CI = interaction.customId;
-        const tokens = await aTokens.getAll();
+        const tokens = await tokenService.getAllTokensForSelectMenu();
          if (tokens.length === 0) return interaction.reply({ content: 'No tokens found!', ephemeral: true });
         const menuId = `menu-${Math.floor(Math.random() * 9000000) + 1000000}`;
         const menu = new MessageSelectMenu()
@@ -32,16 +29,16 @@ module.exports = {
        const type = CI.replaceAll('S', '').replaceAll('O', '');
 	      switch (CI) {
           case 'replkaS':
-           await rTokens.push('tokens', i.values[0]);
+           await tokenService.enableReplka(i.values[0]);
            break;
         case 'replkaO':
-           await rTokens.pull('tokens', i.values[0]);
+           await tokenService.disableReplka(i.values[0]);
            break;
         case 'karasiS':
-           await kTokens.push('tokens', i.values[0]);
+           await tokenService.enableKarasi(i.values[0]);
            break;
         case 'karasiO':
-           await kTokens.pull('tokens', i.values[0]);
+           await tokenService.disableKarasi(i.values[0]);
            break;
            }
         const { stopAllTokens, startTokens } = require(refresh + '/' + type + '.js');

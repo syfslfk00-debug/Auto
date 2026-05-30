@@ -1,5 +1,4 @@
-const { QuantumDB } = require('qd.db');
-const db = new QuantumDB('tokens.json');
+const tokenService = require('../services/tokenService');
 
 module.exports = {
     name: 'interactionCreate',
@@ -9,7 +8,7 @@ module.exports = {
         try {
       const token = interaction.fields.getTextInputValue('token');
       const name = interaction.fields.getTextInputValue('name');
-        await db.set(name, token);
+        await tokenService.addToken(name, token);
         await interaction.reply({ content: 'Done! You can use your bot now.', embeds: [] });
     } catch (error) {
       console.error(error);

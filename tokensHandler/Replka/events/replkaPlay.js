@@ -1,5 +1,7 @@
 module.exports = {
     name: 'messageCreate',
+    eventType: 'game_play',
+    gameName: 'ريبلكا',
     async execute(message, client) {
      if (!message.author.bot) return;
      if (message.content.startsWith(`<@${client.user.id}>`)) {
@@ -233,6 +235,14 @@ module.exports = {
         setTimeout(async () => {
          await message.channel.send(msg);
           }, time);
+        return {
+          handled: true,
+          type: 'game_play',
+          result: 'play',
+          gameName: 'ريبلكا',
+          message: 'بدأ الحساب التفاعل داخل جولة ريبلكا.',
+          details: { category: type, letter: ltr },
+        };
         }
       }
     }

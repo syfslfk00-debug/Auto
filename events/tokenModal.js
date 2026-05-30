@@ -1,4 +1,5 @@
 const tokenService = require('../services/tokenService');
+const eventBus = require('../services/eventBus');
 
 module.exports = {
   name: 'interactionCreate',
@@ -9,6 +10,7 @@ module.exports = {
         const token = interaction.fields.getTextInputValue('token');
         const name = interaction.fields.getTextInputValue('name');
         await tokenService.addToken(name, token);
+        await eventBus.publish({ type: 'admin_action', level: 'إداري', accountName: name, result: 'account_added', message: 'تمت إضافة حساب من ديسكورد.' });
         await interaction.reply({ content: 'تم حفظ الحساب بنجاح، ويمكنك التحكم بمحركاته من لوحة التحكم.', embeds: [], ephemeral: true });
       } catch (error) {
         console.error(error);

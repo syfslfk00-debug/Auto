@@ -15,7 +15,9 @@ function extractDiscordContext(args = []) {
   if (!message) return {};
 
   return {
+    serverId: message.guild ? message.guild.id : undefined,
     serverName: message.guild ? message.guild.name : undefined,
+    channelId: message.channel ? message.channel.id : undefined,
     channelName: message.channel ? message.channel.name : undefined,
     message: typeof message.content === 'string' && message.content.length > 0 ? message.content.slice(0, 300) : undefined,
   };
@@ -31,14 +33,16 @@ async function enrichEvent(event) {
     if (account) accountName = account.name;
   }
 
+  const { token, args, ...safeEvent } = event;
   return {
     ...context,
-    ...event,
+    ...safeEvent,
     engineName: event.engineName || (engine ? engine.displayName : event.engineId),
     accountName,
     status: event.status || 'info',
     details: event.details || {},
     createdAt: event.createdAt || new Date(),
+    token,
   };
 }
 
@@ -48,15 +52,21 @@ function runtimePatch(event) {
     case 'engine_token_started':
       return { status: 'يعمل', lastStartedAt: now, lastActivityAt: now, lastError: null };
     case 'engine_token_stopped':
+    case 'engine_token_restarted':
       return { status: 'متوقف', lastStoppedAt: now, lastActivityAt: now };
     case 'engine_login_failed':
     case 'engine_client_error':
     case 'engine_event_error':
-      return { status: 'خطأ', lastError: event.message || event.result || event.type, lastErrorAt: now, lastActivityAt: now };
-    case 'engine_event':
-      return { lastActivityAt: now, lastEventType: event.result || event.type, lastServer: event.serverName, lastGame: event.gameName };
+      return { status: 'خطأ', lastError: event.message || event.result || event.type, lastErrorAt: now, lastActivityAt: now, lastServer: event.serverName, lastGame: event.gameName };
+    case 'game_join':
+      return { status: 'داخل اللعبة', lastActivityAt: now, lastJoinAt: now, lastEventType: event.type, lastServer: event.serverName, lastGame: event.gameName };
+    case 'game_play':
+      return { status: 'يلعب', lastActivityAt: now, lastPlayAt: now, lastEventType: event.type, lastServer: event.serverName, lastGame: event.gameName };
+    case 'game_result':
+    case 'game_timeout':
+      return { status: event.result === 'win' ? 'فاز' : 'خسر', lastActivityAt: now, lastResultAt: now, lastResult: event.result, lastEventType: event.type, lastServer: event.serverName, lastGame: event.gameName };
     default:
-      return { lastActivityAt: now, lastEventType: event.type };
+      return { lastActivityAt: now, lastEventType: event.type, lastServer: event.serverName, lastGame: event.gameName };
   }
 }
 

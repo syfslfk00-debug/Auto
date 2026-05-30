@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { na3san } = require('../config.json');
 const tokenService = require('../services/tokenService');
 const engineRuntime = require('../services/engineRuntime');
+const eventBus = require('../services/eventBus');
 
 module.exports = {
   category: 'إدارة الحسابات',
@@ -26,6 +27,7 @@ module.exports = {
 
       await engineRuntime.stopTokenEverywhere(token.token);
       await tokenService.removeToken(name);
+      await eventBus.publish({ type: 'admin_action', level: 'إداري', accountName: token.name, result: 'account_deleted', message: 'تم حذف حساب من ديسكورد.' });
       await interaction.reply('تم حذف الحساب بنجاح.');
     } catch (error) {
       console.error(error);

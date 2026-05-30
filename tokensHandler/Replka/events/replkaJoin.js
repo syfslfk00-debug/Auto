@@ -1,21 +1,27 @@
 module.exports = {
-    name: 'messageCreate',
-    async execute(message) {
-     if (!message.author.bot) return;
-      if (message.embeds.length > 0) {
-        const embed = message.embeds[0];
-      if (embed.title === 'ريبلكا') {
-        const components = message.components;
-      if (!components) return;
-      if (components.length > 0) {
-        const jb = components[0].components[0];
-         try {
-            await message.clickButton(jb.customId);
-          } catch (error) {
-                        console.error('Error clicking the button: ', error);
-          }
-        }
-      }
-    }
+  name: 'messageCreate',
+  eventType: 'game_join',
+  gameName: 'ريبلكا',
+  async execute(message) {
+    if (!message.author.bot) return { handled: false };
+    if (message.embeds.length === 0) return { handled: false };
+
+    const embed = message.embeds[0];
+    if (embed.title !== 'ريبلكا') return { handled: false };
+
+    const components = message.components;
+    if (!components || components.length === 0) return { handled: false };
+
+    const jb = components[0].components[0];
+    if (!jb) return { handled: false };
+
+    await message.clickButton(jb.customId);
+    return {
+      handled: true,
+      type: 'game_join',
+      result: 'join',
+      gameName: 'ريبلكا',
+      message: 'تم دخول لعبة ريبلكا.',
+    };
   },
 };

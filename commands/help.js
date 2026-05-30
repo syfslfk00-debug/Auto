@@ -9,7 +9,12 @@ function uniqueCommands(client) {
 
 function commandDescription(command) {
   const json = command.data.toJSON();
-  return json.description || 'لا يوجد وصف.';
+  const lines = [`• /${json.name}`, json.description || 'لا يوجد وصف.'];
+  const subcommands = (json.options || []).filter(option => option.type === 1);
+  if (subcommands.length > 0) {
+    lines.push(subcommands.map(option => `  ◦ /${json.name} ${option.name}: ${option.description || 'لا يوجد وصف.'}`).join('\n'));
+  }
+  return lines.join('\n');
 }
 
 function buildPages(commands) {
@@ -20,12 +25,23 @@ function buildPages(commands) {
     groups.get(category).push(command);
   }
 
-  return [...groups.entries()].map(([category, items]) => {
-    const embed = new MessageEmbed()
-      .setTitle(`المساعدة — ${category}`)
-      .setDescription(items.map(command => `• /${command.data.name}\n${commandDescription(command)}`).join('\n\n'));
-    return embed;
-  });
+  const pages = [];
+  for (const [category, items] of groups.entries()) {
+    let chunk = [];
+    let size = 0;
+    for (const command of items) {
+      const description = commandDescription(command);
+      if (size + description.length > 3500 && chunk.length > 0) {
+        pages.push(new MessageEmbed().setTitle(`المساعدة — ${category}`).setDescription(chunk.join('\n\n')));
+        chunk = [];
+        size = 0;
+      }
+      chunk.push(description);
+      size += description.length;
+    }
+    if (chunk.length > 0) pages.push(new MessageEmbed().setTitle(`المساعدة — ${category}`).setDescription(chunk.join('\n\n')));
+  }
+  return pages;
 }
 
 module.exports = {

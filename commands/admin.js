@@ -6,6 +6,7 @@ const engineRuntime = require('../services/engineRuntime');
 const monitorService = require('../services/monitorService');
 const logService = require('../services/logService');
 const { getEngines, getEngine } = require('../services/engineRegistry');
+const eventBus = require('../services/eventBus');
 
 const settingKeys = {
   'التفعيل': 'enabled',
@@ -42,6 +43,8 @@ function settingLabel(key) {
     wins: 'الانتصارات',
     losses: 'الخسائر',
     joins: 'مرات الدخول',
+    plays: 'مرات اللعب',
+    timeouts: 'انتهاء المهلة',
     lastActivityAt: 'آخر نشاط',
     lastEventType: 'آخر نوع حدث',
     lastGame: 'آخر لعبة',
@@ -81,6 +84,14 @@ function addEngineOptions(subcommand) {
     .addStringOption(option => option.setName('المحرك').setDescription('معرف المحرك داخل السجل').setRequired(true));
 }
 
+function addLogFilterOptions(subcommand) {
+  return subcommand
+    .addStringOption(option => option.setName('الاسم').setDescription('اسم الحساب').setRequired(false))
+    .addStringOption(option => option.setName('المحرك').setDescription('معرف المحرك').setRequired(false))
+    .addStringOption(option => option.setName('النوع').setDescription('نوع الحدث').setRequired(false))
+    .addStringOption(option => option.setName('المستوى').setDescription('مستوى السجل').setRequired(false));
+}
+
 
 function translateEventType(type) {
   const types = {
@@ -95,7 +106,7 @@ function translateEventType(type) {
 }
 
 function logLine(log) {
-  return `• ${log.engineName || log.engineId || 'محرك'} — ${log.accountName || 'حساب غير معروف'} — ${translateEventType(log.type)} — ${formatDate(log.createdAt)}`;
+  return `• ${log.level || 'تشغيلي'} — ${log.engineName || log.engineId || 'محرك'} — ${log.accountName || 'حساب غير معروف'} — ${translateEventType(log.type)} — ${log.result || 'لا يوجد'} — ${formatDate(log.createdAt)}`;
 }
 
 async function findAccount(interaction) {
@@ -122,11 +133,17 @@ module.exports = {
       .addStringOption(option => option.setName('المفتاح').setDescription('التفعيل أو التأخير أو السلوك أو أي مفتاح مستقبلي').setRequired(true))
       .addStringOption(option => option.setName('القيمة').setDescription('القيمة الجديدة').setRequired(true)))
     .addSubcommand(subcommand => addEngineOptions(addAccountOptions(subcommand.setName('اعادة-ضبط').setDescription('إعادة ضبط إعدادات محرك حساب'))))
-    .addSubcommand(subcommand => subcommand.setName('السجلات').setDescription('عرض السجلات')
-      .addStringOption(option => option.setName('الاسم').setDescription('اسم الحساب').setRequired(false))
-      .addStringOption(option => option.setName('المحرك').setDescription('معرف المحرك').setRequired(false))
-      .addStringOption(option => option.setName('النوع').setDescription('نوع الحدث').setRequired(false))
-      .addIntegerOption(option => option.setName('العدد').setDescription('عدد النتائج').setRequired(false)))
+    .addSubcommand(subcommand => addLogFilterOptions(subcommand.setName('السجلات').setDescription('عرض السجلات'))
+      .addIntegerOption(option => option.setName('العدد').setDescription('عدد النتائج').setRequired(false))
+      .addIntegerOption(option => option.setName('الصفحة').setDescription('رقم الصفحة').setRequired(false)))
+    .addSubcommand(subcommand => addLogFilterOptions(subcommand.setName('حذف-سجلات').setDescription('حذف سجلات يدويًا'))
+      .addIntegerOption(option => option.setName('العمر').setDescription('أقدم من عدد أيام').setRequired(false)))
+    .addSubcommand(subcommand => addLogFilterOptions(subcommand.setName('تنظيف-سجلات').setDescription('أرشفة أو حذف سجلات قديمة'))
+      .addIntegerOption(option => option.setName('العمر').setDescription('أقدم من عدد أيام').setRequired(true))
+      .addStringOption(option => option.setName('الوضع').setDescription('أرشفة أو حذف').setRequired(false)))
+    .addSubcommand(subcommand => subcommand.setName('سياسة-السجلات').setDescription('عرض أو تعديل سياسة الاحتفاظ بالسجلات')
+      .addStringOption(option => option.setName('المستوى').setDescription('مستوى السجل').setRequired(false))
+      .addIntegerOption(option => option.setName('الايام').setDescription('عدد أيام الاحتفاظ').setRequired(false)))
     .addSubcommand(subcommand => subcommand.setName('احصائيات').setDescription('عرض الإحصائيات')
       .addStringOption(option => option.setName('الاسم').setDescription('اسم الحساب').setRequired(false))
       .addStringOption(option => option.setName('المحرك').setDescription('معرف المحرك').setRequired(false)))
@@ -202,6 +219,7 @@ module.exports = {
         await engineRuntime.restartEngineToken(engine.id, account.token);
       }
 
+      await eventBus.publish({ type: 'admin_action', level: 'إداري', engineId: engine.id, engineName: engine.displayName, accountName: account.name, result: subcommand, message: `تم تنفيذ إجراء ${subcommand} من ديسكورد.` });
       return interaction.reply({ content: `تم تنفيذ إجراء ${subcommand} لمحرك ${engine.displayName} على الحساب ${account.name}.`, ephemeral: true });
     }
 
@@ -228,6 +246,7 @@ module.exports = {
       const key = settingKeys[rawKey] || rawKey;
       const value = parseSettingValue(key, interaction.options.getString('القيمة'));
       await tokenService.updateEngineSetting(account.token, engine.id, key, value);
+      await eventBus.publish({ type: 'admin_action', level: 'إداري', engineId: engine.id, engineName: engine.displayName, accountName: account.name, result: 'setting_updated', message: `تم تعديل إعداد ${settingLabel(key)}.`, details: { key, value } });
       return interaction.reply({ content: `تم تعديل إعداد ${settingLabel(key)} للحساب ${account.name}.`, ephemeral: true });
     }
 
@@ -238,6 +257,7 @@ module.exports = {
       const engine = getEngine(engineId);
       if (!engine) return interaction.reply({ content: 'لم يتم العثور على المحرك.', ephemeral: true });
       await tokenService.resetEngineSettings(account.token, engine.id);
+      await eventBus.publish({ type: 'admin_action', level: 'إداري', engineId: engine.id, engineName: engine.displayName, accountName: account.name, result: 'settings_reset', message: 'تمت إعادة ضبط إعدادات المحرك.' });
       return interaction.reply({ content: `تمت إعادة ضبط إعدادات ${engine.displayName} للحساب ${account.name}.`, ephemeral: true });
     }
 

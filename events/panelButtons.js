@@ -4,6 +4,7 @@ const tokenService = require('../services/tokenService');
 const engineRuntime = require('../services/engineRuntime');
 const monitorService = require('../services/monitorService');
 const { getEngine } = require('../services/engineRegistry');
+const eventBus = require('../services/eventBus');
 
 function formatDate(value) {
   if (!value) return 'لا يوجد';
@@ -26,7 +27,7 @@ function translateEventType(type) {
 }
 
 function logLine(log) {
-  return `• ${log.engineName || log.engineId || 'محرك'} — ${log.accountName || 'حساب غير معروف'} — ${translateEventType(log.type)} — ${formatDate(log.createdAt)}`;
+  return `• ${log.level || 'تشغيلي'} — ${log.engineName || log.engineId || 'محرك'} — ${log.accountName || 'حساب غير معروف'} — ${translateEventType(log.type)} — ${log.result || 'لا يوجد'} — ${formatDate(log.createdAt)}`;
 }
 
 async function buildMonitorEmbed(type) {
@@ -143,6 +144,8 @@ async function handleEngine(interaction) {
       await engineRuntime.stopEngineToken(engine.id, selectedToken);
     }
 
+    const account = await tokenService.getTokenByValue(selectedToken).catch(() => null);
+    await eventBus.publish({ type: 'admin_action', level: 'إداري', engineId: engine.id, engineName: engine.displayName, accountName: account ? account.name : undefined, result: action === 'on' ? 'engine_enabled' : 'engine_disabled', message: 'تم تغيير حالة محرك من لوحة الإدارة.' });
     const actionText = action === 'on' ? 'تشغيل' : 'إيقاف';
     await i.update({ content: `تم ${actionText} محرك ${engine.displayName} للحساب المحدد بنجاح.`, components: [] });
 

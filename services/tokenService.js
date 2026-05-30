@@ -80,6 +80,8 @@ function normalizeTokenDocument(document) {
       wins: 0,
       losses: 0,
       joins: 0,
+      plays: 0,
+      timeouts: 0,
       ...(engineStats[engine.id] || {}),
     };
     runtime[engine.id] = {

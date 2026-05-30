@@ -6,14 +6,14 @@ const engines = [
     displayName: 'ريبلكا',
     legacyField: 'replkaEnabled',
     eventsPath: path.join(__dirname, '..', 'tokensHandler', 'Replka', 'events'),
-    defaultSettings: { delay: 0, behavior: 'auto' },
+    defaultSettings: { delay: 0, behavior: 'auto', roundTimeout: 60 },
   },
   {
     id: 'karasi',
     displayName: 'كراسي',
     legacyField: 'karasiEnabled',
     eventsPath: path.join(__dirname, '..', 'tokensHandler', 'Karasi', 'events'),
-    defaultSettings: { delay: 0, behavior: 'auto' },
+    defaultSettings: { delay: 0, behavior: 'auto', roundTimeout: 60 },
   },
 ];
 

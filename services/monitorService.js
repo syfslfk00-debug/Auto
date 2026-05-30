@@ -122,6 +122,8 @@ async function getGeneralStats() {
     total.wins += account.totals.wins;
     total.losses += account.totals.losses;
     total.joins += account.totals.joins;
+    total.plays += account.totals.plays;
+    total.timeouts += account.totals.timeouts;
     return total;
   }, {
     events: 0,
@@ -131,6 +133,8 @@ async function getGeneralStats() {
     wins: 0,
     losses: 0,
     joins: 0,
+    plays: 0,
+    timeouts: 0,
     totalAccounts: overview.totalAccounts,
     activeAccounts: overview.activeAccounts,
     stoppedAccounts: overview.stoppedAccounts,

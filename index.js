@@ -7,6 +7,7 @@ const { Routes } = require('discord-api-types/v9');
 const { clientId, guildId } = require('./config.json');
 const { connectDatabase } = require('./handlers/database');
 const engineRuntime = require('./services/engineRuntime');
+const eventBus = require('./services/eventBus');
 
 const token = process.env.TOKEN;
 
@@ -50,20 +51,21 @@ client.on('interactionCreate', async interaction => {
 		await command.execute(interaction, client);
 	} catch (error) {
 		console.error(error);
+		await eventBus.publish({ type: 'admin_action_error', level: 'خطأ', status: 'error', message: error.message, details: { command: interaction.commandName, stack: error.stack } }).catch(() => {});
 		await interaction.reply({ content: 'حدث خطأ أثناء تنفيذ هذا الأمر.', ephemeral: true });
 	}
 });
 
-client.on('unhandledRejection', (reason, promise) => {
-  return;
+client.on('unhandledRejection', reason => {
+  eventBus.publish({ type: 'client_unhandled_rejection', level: 'خطأ', status: 'error', message: reason && reason.message ? reason.message : String(reason), details: { stack: reason && reason.stack } }).catch(() => {});
 });
 
 process.on('uncaughtException', error => {
-  return;
+  eventBus.publish({ type: 'uncaught_exception', level: 'خطأ', status: 'error', message: error.message, details: { stack: error.stack } }).catch(() => {});
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  return;
+process.on('unhandledRejection', reason => {
+  eventBus.publish({ type: 'unhandled_rejection', level: 'خطأ', status: 'error', message: reason && reason.message ? reason.message : String(reason), details: { stack: reason && reason.stack } }).catch(() => {});
 });
 
 async function startApplication() {
@@ -85,6 +87,7 @@ async function startApplication() {
     console.log('تم تحديث أوامر التطبيق بنجاح.');
     } catch (error) {
         console.error(error);
+        await eventBus.publish({ type: 'admin_action_error', level: 'خطأ', status: 'error', message: error.message, details: { action: 'refresh_commands', stack: error.stack } }).catch(() => {});
     }
 
     await engineRuntime.startAllEngines();
@@ -94,4 +97,5 @@ async function startApplication() {
 
 startApplication().catch(error => {
     console.error('فشل بدء التطبيق:', error);
+    eventBus.publish({ type: 'startup_failed', level: 'خطأ', status: 'error', message: error.message, details: { stack: error.stack } }).catch(() => {});
 });

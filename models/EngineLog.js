@@ -6,6 +6,11 @@ const engineLogSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  level: {
+    type: String,
+    default: 'تشغيلي',
+    index: true,
+  },
   engineId: {
     type: String,
     index: true,
@@ -23,8 +28,15 @@ const engineLogSchema = new mongoose.Schema({
   },
   result: {
     type: String,
+    index: true,
+  },
+  serverId: {
+    type: String,
   },
   serverName: {
+    type: String,
+  },
+  channelId: {
     type: String,
   },
   channelName: {
@@ -40,6 +52,14 @@ const engineLogSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed,
     default: () => ({}),
   },
+  archived: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  expiresAt: {
+    type: Date,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -52,5 +72,8 @@ const engineLogSchema = new mongoose.Schema({
 engineLogSchema.index({ engineId: 1, createdAt: -1 });
 engineLogSchema.index({ accountName: 1, createdAt: -1 });
 engineLogSchema.index({ type: 1, createdAt: -1 });
+engineLogSchema.index({ level: 1, createdAt: -1 });
+engineLogSchema.index({ archived: 1, createdAt: -1 });
+engineLogSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.models.EngineLog || mongoose.model('EngineLog', engineLogSchema);

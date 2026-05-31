@@ -16,9 +16,18 @@ client.commands = new Collection();
 
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
+// 🚀 الميزة الضرورية المقررة: تعريف المصفوفة لتجميع بيانات السلاش كوماند لإرسالها لـ Discord API
+const commands = [];
+
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     client.commands.set(command.data.name, command);
+    
+    // تحويل بيانات أمر السلاش إلى تنسيق JSON مسموح وإضافته للمصفوفة تلقائياً
+    if (command.data && typeof command.data.toJSON === 'function') {
+        commands.push(command.data.toJSON());
+    }
+    
     if (Array.isArray(command.aliases)) {
         for (const alias of command.aliases) client.commands.set(alias, command);
     }

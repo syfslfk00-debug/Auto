@@ -19,11 +19,7 @@ async function autocompleteAccounts(interaction) { const focused = interaction.o
 function idsFromText(text) { return gamePolicyService.uniqueList(text || ''); }
 function resolveGuildName(client, id) { const guild = client.guilds && client.guilds.cache ? client.guilds.cache.get(String(id)) : null; return guild ? guild.name : 'غير معروف/غير متاح للبوت'; }
 function listLines(ids, client) { return ids.length ? ids.map(id => `• \`${id}\` — ${resolveGuildName(client, id)}`) : ['لا توجد قيود محفوظة.']; }
-<<<<<<< HEAD
-function botLines(ids, client) { return ids.length ? ids.map(id => { const user = client.users && client.users.cache ? client.users.cache.get(String(id)) : null; return `• \`${id}\` — ${user ? user.tag : 'بوت غير موجود في الكاش'}`; }) : ['لا توجد بوتات مسموحة؛ سيتم تجاهل رسائل النتائج لهذا المحرك حتى تضيف بوتًا.']; }
-=======
 function botLines(ids, client) { return ids.length ? ids.map(id => { const user = client.users && client.users.cache ? client.users.cache.get(String(id)) : null; return `• \`${id}\` — ${user ? user.tag : 'بوت غير موجود في الكاش'}`; }) : ['لا توجد بوتات محفوظة في القائمة.']; }
->>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
 async function accountByName(name) { return name ? tokenService.getToken(name) : null; }
 function modalFor(kind, payload, label) {
   const id = `policy-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -102,11 +98,7 @@ module.exports = {
       await eventBus.publish({ type: 'admin_action', level: 'إداري', engineId: payload.engineId, accountName: payload.accountName, result: 'allowed_servers_changed', message: 'تم تعديل السيرفرات المسموحة.' });
       return interaction.reply({ embeds: [statusEmbed('success', 'تم تحديث السيرفرات', listLines(next, client))], ephemeral: true });
     }
-<<<<<<< HEAD
-    if (sub === 'بوتات') { const engineId = interaction.options.getString('المحرك'); return interaction.reply({ embeds: [embed({ title: '🤖 بوتات اللعبة المسموحة', color: COLORS.info, description: botLines(gamePolicyService.uniqueList(policy.engineAllowedBots[engineId] || []), client).join('\n') })], ephemeral: true }); }
-=======
     if (sub === 'بوتات') { const engineId = interaction.options.getString('المحرك'); const rows = [`فلترة البوتات: **${gamePolicyService.isBotFilterEnabled(policy, engineId) ? 'مفعّلة' : 'معطّلة – كل البوتات مسموحة'}**`, ...botLines(gamePolicyService.uniqueList(policy.engineAllowedBots[engineId] || []), client)]; return interaction.reply({ embeds: [embed({ title: '🤖 بوتات اللعبة المسموحة', color: COLORS.info, description: rows.join('\n') })], ephemeral: true }); }
->>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
     if (sub === 'بوتات-ضبط') {
       const payload = { engineId: interaction.options.getString('المحرك'), op: interaction.options.getString('العملية') }; const raw = interaction.options.getString('المعرفات');
       if (payload.op !== 'reset' && !raw) return interaction.showModal(modalFor('bots', payload, 'تعديل بوتات اللعبة'));
@@ -124,11 +116,7 @@ module.exports = {
     if (sub === 'اعدادات') {
       const account = await accountByName(interaction.options.getString('الحساب')); const engineId = interaction.options.getString('المحرك');
       const settings = account && account.engineSettings ? account.engineSettings[engineId] || {} : {};
-<<<<<<< HEAD
-      return interaction.reply({ embeds: [statusEmbed('info', 'إعدادات اللعب للحساب', [`الحساب: **${account ? account.name : 'غير موجود'}**`, `المحرك: **${engineId}**`, `منع التداخل: **${gamePolicyService.isOverlapLockEnabled(policy, engineId) ? 'مفعل' : 'معطل'}**`, `السيرفرات المسموحة للحساب: ${gamePolicyService.uniqueList(settings.allowedServers || []).join(', ') || 'يرث من المحرك/العام'}`, `Player ID: ${settings.playerId ? `\`${settings.playerId}\`` : 'غير محدد'}`])], ephemeral: true });
-=======
       return interaction.reply({ embeds: [statusEmbed('info', 'إعدادات اللعب للحساب', [`الحساب: **${account ? account.name : 'غير موجود'}**`, `المحرك: **${engineId}**`, `منع التداخل: **${gamePolicyService.isOverlapLockEnabled(policy, engineId) ? 'مفعل' : 'معطل'}**`, `فلترة البوتات: **${gamePolicyService.isBotFilterEnabled(policy, engineId) ? 'مفعّلة' : 'معطّلة – كل البوتات مسموحة'}**`, `السيرفرات المسموحة للحساب: ${gamePolicyService.uniqueList(settings.allowedServers || []).join(', ') || 'يرث من المحرك/العام'}`, `Player ID: ${settings.playerId ? `\`${settings.playerId}\`` : 'غير محدد'}`])], ephemeral: true });
->>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
     }
   },
   applyServerChange,

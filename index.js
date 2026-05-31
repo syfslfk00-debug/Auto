@@ -24,16 +24,25 @@ for (const file of commandFiles) {
     }
 }
 
-const commands = [...new Set(client.commands.map(command => command))].map(command => command.data.toJSON());
-
 const eventsFolder = './events';
 const eventFiles = fs.readdirSync(eventsFolder).filter(file => file.endsWith('.js'));
 for (const file of eventFiles) {
     const event = require(`./events/${file}`);
+    
     if (event.once) {
         client.once(event.name, (...args) => event.execute(...args, client));
     } else {
+        // الربط الطبيعي للأحداث
         client.on(event.name, (...args) => event.execute(...args, client));
+
+        // إشراك حدث التعديل (messageUpdate) إذا كان الملف مهتماً بـ messageCreate
+        if (event.name === 'messageCreate') {
+            client.on('messageUpdate', async (oldMessage, newMessage) => {
+                // نمرر الرسالة الجديدة المحدثة ليتم فحصها بنفس كود الـ messageCreate
+                // مع تمرير كائن client كمعامل أخير كما هو في ملفك الرئيسي
+                await event.execute(newMessage, client); 
+            });
+        }
     }
 }
 

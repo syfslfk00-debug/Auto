@@ -1,5 +1,9 @@
 const { connectDatabase } = require('../handlers/database');
 const GamePolicy = require('../models/GamePolicy');
+<<<<<<< HEAD
+=======
+const { getEngines } = require('./engineRegistry');
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
 
 const DEFAULT_KEY = 'default';
 const activeLocks = new Map();
@@ -20,8 +24,21 @@ function uniqueList(items) {
   return [...new Set((Array.isArray(items) ? items : String(items || '').split(/[\s,\n]+/)).map(item => String(item || '').trim()).filter(Boolean))];
 }
 
+<<<<<<< HEAD
 function normalize(doc) {
   const base = doc || {};
+=======
+function defaultBotFilters(value) {
+  return getEngines().reduce((filters, engine) => {
+    filters[engine.id] = value && value[engine.id] !== undefined ? Boolean(value[engine.id]) : true;
+    return filters;
+  }, {});
+}
+
+function normalize(doc) {
+  const base = doc || {};
+  const engineBotFilters = mapToObject(base.engineBotFilters);
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
   return {
     key: base.key || DEFAULT_KEY,
     overlapLockEnabled: Boolean(base.overlapLockEnabled),
@@ -29,6 +46,10 @@ function normalize(doc) {
     allowedServers: uniqueList(base.allowedServers || []),
     engineAllowedServers: mapToObject(base.engineAllowedServers),
     engineAllowedBots: mapToObject(base.engineAllowedBots),
+<<<<<<< HEAD
+=======
+    engineBotFilters: defaultBotFilters(engineBotFilters),
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
     updatedAt: base.updatedAt,
   };
 }
@@ -37,7 +58,11 @@ async function getPolicy() {
   await ensureDatabase();
   const doc = await GamePolicy.findOneAndUpdate(
     { key: DEFAULT_KEY },
+<<<<<<< HEAD
     { $setOnInsert: { key: DEFAULT_KEY, updatedAt: new Date() } },
+=======
+    { $setOnInsert: { key: DEFAULT_KEY, engineBotFilters: defaultBotFilters({}), updatedAt: new Date() } },
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
     { new: true, upsert: true }
   ).lean();
   return normalize(doc);
@@ -69,6 +94,30 @@ async function setAllowedBots(engineId, ids) {
   ).lean());
 }
 
+<<<<<<< HEAD
+=======
+function isBotFilterEnabled(policy, engineId) {
+  const value = policy.engineBotFilters && policy.engineBotFilters[engineId];
+  return value === undefined ? true : Boolean(value);
+}
+
+async function setBotFilterEnabled(engineId, enabled) {
+  await ensureDatabase();
+  return normalize(await GamePolicy.findOneAndUpdate(
+    { key: DEFAULT_KEY },
+    { $set: { [`engineBotFilters.${engineId}`]: Boolean(enabled), updatedAt: new Date() } },
+    { new: true, upsert: true }
+  ).lean());
+}
+
+async function toggleBotFilter(engineId) {
+  const policy = await getPolicy();
+  const next = !isBotFilterEnabled(policy, engineId);
+  const updated = await setBotFilterEnabled(engineId, next);
+  return { policy: updated, enabled: next };
+}
+
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
 function getEngineList(map, engineId) {
   const item = map && map[engineId];
   return uniqueList(item || []);
@@ -89,6 +138,10 @@ function isServerAllowed(policy, account, engineId, serverId) {
 }
 
 function isBotAllowed(policy, engineId, botId) {
+<<<<<<< HEAD
+=======
+  if (!isBotFilterEnabled(policy, engineId)) return true;
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
   const list = getEngineList(policy.engineAllowedBots, engineId);
   if (list.length === 0) return false;
   return Boolean(botId && list.includes(String(botId)));
@@ -162,10 +215,19 @@ module.exports = {
   setOverlapLock,
   setAllowedServers,
   setAllowedBots,
+<<<<<<< HEAD
+=======
+  setBotFilterEnabled,
+  toggleBotFilter,
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
   uniqueList,
   serverListFor,
   isServerAllowed,
   isBotAllowed,
+<<<<<<< HEAD
+=======
+  isBotFilterEnabled,
+>>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
   isOverlapLockEnabled,
   acquireLock,
   releaseLock,

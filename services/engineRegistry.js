@@ -15,6 +15,13 @@ const engines = [
     eventsPath: path.join(__dirname, '..', 'tokensHandler', 'Karasi', 'events'),
     defaultSettings: { delay: 0, behavior: 'auto', roundTimeout: 60 },
   },
+  {
+    id: 'roulette',
+    displayName: 'روليت',
+    legacyField: 'rouletteEnabled',
+    eventsPath: path.join(__dirname, '..', 'tokensHandler', 'Roulette', 'events'),
+    defaultSettings: { delay: 0, behavior: 'auto', roundTimeout: 60 },
+  },
 ];
 
 const engineMap = new Map(engines.map(engine => [engine.id, engine]));

@@ -10,7 +10,7 @@ module.exports = {
     let message = [arg1, arg2].find(arg => arg && (arg.components || arg.embeds || arg.content) && arg.author?.bot);
     
     if (!message) {
-      console.log("❌ لم يتم العثور على كائن الرسالة الصحيح في المعاملات (تأكد من الـ index.js).");
+      console.log("❌ لم يتم العثور على كائن الرسالة الصحيح في المعاملات.");
       return { handled: false };
     }
 
@@ -39,58 +39,67 @@ module.exports = {
       return { handled: false };
     }
 
-    console.log("🎯 [نجاح] تم رصد رسالة لعبة الروليت! جاري فحص الأزرار...");
+    console.log("🎯 [نجاح] تم رصد رسالة لعبة الروليت! جاري فرز الخانات الشاغرة...");
 
     if (!message.components || message.components.length === 0) {
-      console.log("⚠️ غريب! تم رصد الرسالة ولكن لا توجد أزرار (ربما لم تُحمل بعد).");
+      console.log("⚠️ غريب! لا توجد أزرار متوفرة في الرسالة.");
       return { handled: false };
     }
 
     // تسطيح جميع الأزرار من كافة الصفوف في مصفوفة واحدة
     const allButtons = message.components.flatMap(row => row.components);
-    console.log(`📊 إجمالي الأزرار المكتشفة في الرسالة: ${allButtons.length} زر.`);
 
-    // البحث عن أول زر متاح (رقمي) مع استبعاد أزرار التحكم الخاطئة
-    const targetButton = allButtons.find(button => {
+    // تجميع كاااافة الأزرار الرقمية المتاحة (الخانات غير المحجوزة)
+    const availableButtons = allButtons.filter(button => {
       if (button.disabled) return false;
       const label = button.label || '';
-      // استبعاد أزرار الخروج والمتجر لضمان الضغط على رقم مباشر
+      // استبعاد أزرار التحكم الخاطئة
       if (label.includes('اخرج') || label.includes('متجر')) return false;
       return true;
     });
 
-    if (!targetButton) {
-      console.log("❌ لم يتم العثور على أي زر متاح للضغط (قد تكون الغرفة ممتلئة بالكامل).");
+    if (availableButtons.length === 0) {
+      console.log("❌ لم يتم العثور على أي رقم شاغر للضغط (اللوبي ممتلئ بالكامل).");
       return { handled: false };
     }
 
-    console.log(`✅ تم اختيار الزر بنجاح! النص عليه هو: [${targetButton.label || 'رقم'}]`);
+    console.log(`📊 عدد الأرقام الشاغرة المتاحة حالياً: ${availableButtons.length} خانة.`);
 
-    // استدعاء دالة الضغط مع التأخير الزمني لحل مشكلة الـ Click المرفوض
-    return await clickWithDelay(message, targetButton);
+    // 🎲 التمويه العشوائي: اختيار زر عشوائي تماماً من قائمة الخانات المتاحة
+    const randomIndex = Math.floor(Math.random() * availableButtons.length);
+    const targetButton = availableButtons[randomIndex];
+
+    console.log(`🎲 نظام الحماية اختار لك الرقم: [${targetButton.label}] بشكل عشوائي.`);
+
+    // استدعاء دالة الضغط التلقائي مع التأخير البشري المتغير
+    return await clickWithHumanDelay(message, targetButton);
   },
 };
 
-// دالة تفصل الضغط وتمنحه وقتاً للاستقرار
-async function clickWithDelay(message, button) {
-  const delayMs = 700; // تأخير 700 ملي ثانية لضمان استقرار الرسالة في ديسكورد
-  console.log(`⏱️ جاري الانتظار لمدة ${delayMs}ms قبل الضغط لضمان قبول العملية...`);
+// دالة الضغط بنظام التوقيت العشوائي (التمويه البشري)
+async function clickWithHumanDelay(message, button) {
+  // توليد تأخير عشوائي بين 500 ملي ثانية (نصف ثانية) و 1200 ملي ثانية (ثانية وربع)
+  const minDelay = 500;
+  const maxDelay = 1200;
+  const delayMs = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+  
+  console.log(`⏱️ محاكاة حركة البشر: سينتظر البوت مدة عشوائية قدرها ${delayMs}ms قبل إرسال الضغطة...`);
   
   await new Promise(resolve => setTimeout(resolve, delayMs));
 
   try {
-    // محاولة الضغط السحرية
+    // إرسال الضغطة إلى ديسكورد
     await message.clickButton(button.customId);
-    console.log(`🚀 [مبهر] تم إرسال ضغطة الزر بنجاح إلى ديسكورد!`);
+    console.log(`🚀 [ممتاز] تم حجز الرقم [${button.label}] والدخول إلى اللعبة بنجاح تمويهي كامل!`);
     return {
       handled: true,
       type: 'game_join',
       result: 'join',
       gameName: 'روليت',
-      message: `تم الانضمام للعبة عبر زر الرقم المتاح.`,
+      message: `تم الدخول عشوائياً بالرقم: ${button.label}`,
     };
   } catch (error) {
-    console.error("❌ فشلت مكتبة السيلف بوت في الضغط على الزر، السبب:", error.message);
+    console.error("❌ فشلت محاولة الضغط العشوائي، السبب:", error.message);
     return { handled: false };
   }
 }

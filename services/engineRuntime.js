@@ -3,13 +3,16 @@ const path = require('path');
 const { Client } = require('discord.js-selfbot-v13');
 const tokenService = require('./tokenService');
 const eventBus = require('./eventBus');
+const gamePolicyService = require('./gamePolicyService');
 const { getEngines, requireEngine } = require('./engineRegistry');
 
 const activeClients = new Map();
 const activeRounds = new Map();
 
-const winPatterns = ['فوز', 'فزت', 'ربحت', 'نجحت', 'victory', 'won', 'win', 'success'];
-const lossPatterns = ['خسرت', 'خسارة', 'لم تفز', 'fail', 'lost', 'loss', 'game over', 'انتهت المحاولة'];
+const WIN_PHRASES = ['فاز باللعبة', 'فاز'];
+const LOSS_PHRASES = ['خسرت', 'خسر', 'تم طرد'];
+const processedOutcomeMessages = new Set();
+const MAX_PROCESSED_OUTCOME_MESSAGES = 1000;
 
 function engineClients(engineId) {
   if (!activeClients.has(engineId)) activeClients.set(engineId, new Map());
@@ -34,6 +37,14 @@ function messageFromArgs(args = []) {
   return args.find(item => item && item.guild && item.channel)
     || args.find(item => item && item.channel)
     || args.find(item => item && item.content);
+}
+
+function outcomeMessageFromArgs(args = []) {
+  for (let index = args.length - 1; index >= 0; index -= 1) {
+    const item = args[index];
+    if (item && item.author && (item.guild || item.channel || item.content || Array.isArray(item.embeds))) return item;
+  }
+  return messageFromArgs(args);
 }
 
 function textFromMessage(message) {
@@ -61,11 +72,50 @@ function contextFromArgs(args = []) {
   };
 }
 
-function outcomeFromArgs(args = []) {
-  const text = textFromMessage(messageFromArgs(args));
+function rememberProcessedOutcomeMessage(messageId) {
+  if (!messageId) return;
+  processedOutcomeMessages.add(messageId);
+  if (processedOutcomeMessages.size > MAX_PROCESSED_OUTCOME_MESSAGES) {
+    const oldestMessageId = processedOutcomeMessages.values().next().value;
+    processedOutcomeMessages.delete(oldestMessageId);
+  }
+}
+
+function playerIdentifiers(account, client, settings) {
+  return [
+    settings && settings.playerId,
+    account && account.playerId,
+    account && account.name,
+    client && client.user && client.user.id ? `<@${client.user.id}>` : null,
+    client && client.user && client.user.id ? `<@!${client.user.id}>` : null,
+    client && client.user && client.user.id,
+  ].map(item => String(item || '').trim().toLowerCase()).filter(Boolean);
+}
+
+function outcomeFromArgs(args = [], account, client, settings, policy, engine) {
+  const message = outcomeMessageFromArgs(args);
+  if (!message || !message.author || !message.author.bot) return null;
+  if (!gamePolicyService.isBotAllowed(policy, engine.id, message.author.id)) return null;
+  if (message.id && processedOutcomeMessages.has(message.id)) return null;
+
+  const text = textFromMessage(message);
   if (!text) return null;
-  if (winPatterns.some(pattern => text.includes(pattern))) return { type: 'game_result', result: 'win', level: 'نجاح', reason: 'رسالة تدل على الفوز' };
-  if (lossPatterns.some(pattern => text.includes(pattern))) return { type: 'game_result', result: 'loss', level: 'خسارة', reason: 'رسالة تدل على الخسارة' };
+
+  const identifiers = playerIdentifiers(account, client, settings);
+  if (identifiers.length === 0 || !identifiers.some(identifier => text.includes(identifier))) return null;
+
+  const winPhrase = WIN_PHRASES.find(phrase => text.includes(phrase));
+  if (winPhrase) {
+    rememberProcessedOutcomeMessage(message.id);
+    return { type: 'game_result', result: 'win', level: 'نجاح', reason: `رسالة بوت مسموح تحتوي: ${winPhrase}`, messageId: message.id };
+  }
+
+  const lossPhrase = LOSS_PHRASES.find(phrase => text.includes(phrase));
+  if (lossPhrase) {
+    rememberProcessedOutcomeMessage(message.id);
+    return { type: 'game_result', result: 'loss', level: 'خسارة', reason: `رسالة بوت مسموح تحتوي: ${lossPhrase}`, messageId: message.id };
+  }
+
   return null;
 }
 
@@ -80,28 +130,11 @@ function clearRound(engineId, token) {
   activeRounds.delete(key);
 }
 
-function scheduleRoundTimeout(engine, token, baseEvent, settings) {
+function scheduleRoundTimeout(engine, token) {
   clearRound(engine.id, token);
-  const timeoutSeconds = Number(settings && settings.roundTimeout ? settings.roundTimeout : engine.defaultSettings && engine.defaultSettings.roundTimeout ? engine.defaultSettings.roundTimeout : 60);
-  if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) return;
-
-  const timeout = setTimeout(() => {
-    publishRuntimeEvent({
-      ...baseEvent,
-      type: 'game_timeout',
-      level: 'خسارة',
-      result: 'loss',
-      status: 'timeout',
-      message: 'انتهت المهلة دون ظهور رسالة فوز.',
-      details: { reason: 'timeout' },
-    });
-    activeRounds.delete(roundKey(engine.id, token));
-  }, Math.min(timeoutSeconds, 600) * 1000);
-
-  activeRounds.set(roundKey(engine.id, token), timeout);
 }
 
-function eventFromHandlerResult(result, event, engine, token, args, settings) {
+function eventFromHandlerResult(result, event, engine, token, args, settings, account, lockInfo) {
   if (!result || result.handled === false) return null;
   const context = contextFromArgs(args);
   const eventType = result.type || event.eventType || 'game_event';
@@ -119,6 +152,7 @@ function eventFromHandlerResult(result, event, engine, token, args, settings) {
     details: {
       file: event.fileName,
       ...(result.details || {}),
+      lockKey: lockInfo && lockInfo.key,
     },
   };
 
@@ -127,8 +161,8 @@ function eventFromHandlerResult(result, event, engine, token, args, settings) {
   return gameEvent;
 }
 
-function outcomeEventFromMessage(event, engine, token, args) {
-  const outcome = outcomeFromArgs(args);
+function outcomeEventFromMessage(event, engine, token, args, account, client, settings, policy) {
+  const outcome = outcomeFromArgs(args, account, client, settings, policy, engine);
   if (!outcome) return null;
   clearRound(engine.id, token);
   return {
@@ -141,11 +175,57 @@ function outcomeEventFromMessage(event, engine, token, args) {
     status: 'info',
     result: outcome.result,
     gameName: event.gameName || engine.displayName,
-    details: { file: event.fileName, reason: outcome.reason },
+    details: { file: event.fileName, reason: outcome.reason, messageId: outcome.messageId },
   };
 }
 
-function loadEngineEvents(client, engine, token, settings) {
+
+function isLikelyGameMessage(message, event) {
+  if (!message || !message.author) return true;
+  const text = textFromMessage(message);
+  const gameName = String(event.gameName || '').toLowerCase();
+  if (event.eventType === 'game_join') {
+    const hasGameName = !gameName || text.includes(gameName);
+    const hasComponents = Array.isArray(message.components) && message.components.length > 0;
+    return hasGameName && (hasComponents || text.length > 0);
+  }
+  if (event.eventType === 'game_play') {
+    const hasComponents = Array.isArray(message.components) && message.components.length > 0;
+    return hasComponents || text.includes('لديك') || text.includes('اضغط');
+  }
+  return true;
+}
+
+async function runtimeGate(args, event, engine, token, settings, account) {
+  const policy = await gamePolicyService.getPolicy();
+  const message = outcomeMessageFromArgs(args);
+  const context = contextFromArgs(args);
+
+  if (message && message.author) {
+    if (!message.author.bot) return { allowed: false, policy };
+    if (!gamePolicyService.isBotAllowed(policy, engine.id, message.author.id)) return { allowed: false, policy };
+    if (!isLikelyGameMessage(message, event)) return { allowed: false, policy };
+  }
+
+  if (context.serverId && !gamePolicyService.isServerAllowed(policy, account, engine.id, context.serverId)) return { allowed: false, policy };
+
+  if (event.eventType === 'game_join' || event.eventType === 'game_play') {
+    const lock = gamePolicyService.acquireLock({
+      policy,
+      engineId: engine.id,
+      serverId: context.serverId,
+      gameName: event.gameName || engine.displayName,
+      token,
+      accountName: account ? account.name : undefined,
+    });
+    if (!lock.acquired) return { allowed: false, policy, lock };
+    return { allowed: true, policy, lock };
+  }
+
+  return { allowed: true, policy };
+}
+
+function loadEngineEvents(client, engine, token, settings, account) {
   if (!fs.existsSync(engine.eventsPath)) {
     console.warn(`[EngineRuntime] Events folder not found for ${engine.id}: ${engine.eventsPath}`);
     return;
@@ -160,9 +240,16 @@ function loadEngineEvents(client, engine, token, settings) {
 
     const handler = async (...args) => {
       try {
+        const gate = await runtimeGate(args, event, engine, token, settings, account);
+        if (!gate.allowed) return null;
+
         const result = await event.execute(...args, client);
-        const semanticEvent = eventFromHandlerResult(result, event, engine, token, args, settings) || outcomeEventFromMessage(event, engine, token, args);
-        if (semanticEvent) await publishRuntimeEvent(semanticEvent);
+        if ((!result || result.handled === false) && gate.lock && gate.lock.key) gamePolicyService.releaseLock(gate.lock.key, token);
+        const semanticEvent = eventFromHandlerResult(result, event, engine, token, args, settings, account, gate.lock) || outcomeEventFromMessage(event, engine, token, args, account, client, settings, gate.policy);
+        if (semanticEvent) {
+          if (semanticEvent.type === 'game_result') gamePolicyService.releaseLockFromEvent(semanticEvent);
+          await publishRuntimeEvent(semanticEvent);
+        }
         return result;
       } catch (error) {
         await publishRuntimeEvent({
@@ -201,6 +288,7 @@ async function stopEngineToken(engineId, token, reason = 'stopped') {
   } finally {
     clients.delete(token);
     clearRound(engine.id, token);
+    gamePolicyService.releaseLocksForToken(token, engine.id);
   }
 
   await publishRuntimeEvent({
@@ -224,7 +312,8 @@ async function startEngineToken(engineId, token) {
   if (!token) throw new Error('Token value is required.');
   if (clients.has(token)) return clients.get(token);
 
-  const settings = await tokenService.getEngineSettings(token, engine.id).catch(() => null);
+  const account = await tokenService.getTokenByValue(token).catch(() => null);
+  const settings = account && account.engineSettings ? account.engineSettings[engine.id] : await tokenService.getEngineSettings(token, engine.id).catch(() => null);
   const delay = Number(settings && settings.delay ? settings.delay : 0);
   if (Number.isFinite(delay) && delay > 0) await wait(Math.min(delay, 60) * 1000);
 
@@ -243,7 +332,7 @@ async function startEngineToken(engineId, token) {
     console.error(`[EngineRuntime] ${engine.id} client error:`, safeError(error));
   });
 
-  loadEngineEvents(client, engine, token, settings);
+  loadEngineEvents(client, engine, token, settings, account);
 
   try {
     await client.login(token);

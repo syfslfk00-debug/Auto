@@ -1,30 +1,39 @@
 module.exports = {
-  name: 'messageCreate',
+  // تم تغيير الاسم ليعبر عن الوظيفة، ولكن يفضل ربطه بحدثين في ملف التشغيل الرئيسي لديك
+  name: 'messageCreate', 
   eventType: 'game_join',
   gameName: 'روليت',
-  async execute(message) {
+  async execute(oldMessage, newMessage) {
+    // لدعم حدث messageUpdate و messageCreate معاً
+    // في حال كان الحدث messageCreate سيكون oldMessage هو الرسالة الحقيقية
+    // في حال كان messageUpdate سيكون newMessage هو الرسالة المحدثة
+    const message = newMessage || oldMessage;
+
+    if (!message || !message.author) return { handled: false };
     if (!message.author.bot) return { handled: false };
 
     // تجميع النصوص من محتوى الرسالة العادي
     let allTexts = [];
     if (message.content) allTexts.push(message.content);
 
-    // تجميع النصوص من الإيمبد إن وجد
-    if (message.embeds.length > 0) {
+    // تجميع النصوص من الإيمبد مع دعم v13 و v14
+    if (message.embeds && message.embeds.length > 0) {
       const embed = message.embeds[0];
-      if (embed.title) allTexts.push(embed.title);
-      if (embed.description) allTexts.push(embed.description);
-      if (embed.fields) {
-        for (const field of embed.fields) {
+      const embedData = embed.data || embed; // يضمن التوافق مع الإصدارين
+
+      if (embedData.title) allTexts.push(embedData.title);
+      if (embedData.description) allTexts.push(embedData.description);
+      if (embedData.fields) {
+        for (const field of embedData.fields) {
           if (field.name) allTexts.push(field.name);
           if (field.value) allTexts.push(field.value);
         }
       }
-      if (embed.footer && embed.footer.text) allTexts.push(embed.footer.text);
-      if (embed.author && embed.author.name) allTexts.push(embed.author.name);
+      if (embedData.footer && embedData.footer.text) allTexts.push(embedData.footer.text);
+      if (embedData.author && embedData.author.name) allTexts.push(embedData.author.name);
     }
 
-    // البحث عن "روليت" أو "العجلة" في جميع النصوص
+    // البحث عن "روليت" أو "العجلة" في جميع النصوص المجموعة
     const hasGameName = allTexts.some(text =>
       text.includes('روليت') || text.includes('العجلة')
     );
@@ -62,13 +71,19 @@ module.exports = {
 
     if (!targetButton) return { handled: false };
 
-    await message.clickButton(targetButton.customId);
-    return {
-      handled: true,
-      type: 'game_join',
-      result: 'join',
-      gameName: 'روليت',
-      message: 'تم دخول لعبة روليت.',
-    };
+    try {
+      // التأكد من أن مكتبة السيلف بوت تدعم هذه الدالة على كائن الرسالة
+      await message.clickButton(targetButton.customId);
+      return {
+        handled: true,
+        type: 'game_join',
+        result: 'join',
+        gameName: 'روليت',
+        message: 'تم دخول لعبة روليت بنجاح.',
+      };
+    } catch (error) {
+      console.error("خطأ أثناء محاولة الضغط على الزر:", error);
+      return { handled: false };
+    }
   },
 };

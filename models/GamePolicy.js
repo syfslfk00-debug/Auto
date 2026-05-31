@@ -7,10 +7,7 @@ const gamePolicySchema = new mongoose.Schema({
   allowedServers: { type: [String], default: () => [] },
   engineAllowedServers: { type: Map, of: [String], default: () => ({}) },
   engineAllowedBots: { type: Map, of: [String], default: () => ({}) },
-<<<<<<< HEAD
-=======
   engineBotFilters: { type: Map, of: Boolean, default: () => ({}) },
->>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
   updatedAt: { type: Date, default: Date.now },
 }, { versionKey: false });
 

@@ -3,13 +3,20 @@ module.exports = {
   eventType: 'game_play',
   gameName: 'روليت',
   async execute(message) {
-    // التحقق من أن المرسل بوت وأن الرسالة تحتوي على أزرار
+    // 1. التحقق المبدئي السريع قبل استهلاك الـ API
     if (!message.author.bot) return { handled: false };
     if (!message.components || message.components.length === 0) return { handled: false };
 
     // التحقق من أن الدور الحالي هو دور حسابنا
     const myUserId = message.client.user.id;
     if (!message.content.includes(`<@${myUserId}>`) && !message.content.includes(`<@!${myUserId}>`)) {
+      return { handled: false };
+    }
+
+    // 2. تحديث بيانات الرسالة فوراً من السيرفر لضمان قراءة الأزرار المتبقية الحقيقية فقط
+    const freshMessage = await message.channel.messages.fetch(message.id).catch(() => null);
+    if (!freshMessage || !freshMessage.components || freshMessage.components.length === 0) {
+      console.log("⚠️ تعذر جلب تحديث الرسالة الحية من السيرفر أو أن الأزرار اختفت بالكامل.");
       return { handled: false };
     }
 
@@ -33,23 +40,26 @@ module.exports = {
       global.whitelistConfig.botAccounts.add(message.client.user.username.toLowerCase());
     }
 
-    // تجميع كافة الأزرار في مصفوفة واحدة
-    const allButtons = message.components.flatMap(row => row.components);
+    // 3. تجميع كافة الأزرار الحية الحالية من الرسالة المحدثة
+    const allButtons = freshMessage.components.flatMap(row => row.components);
 
-    // تصفية الأزرار الصالحة للعب (غير معطلة وليست انسحاب أو طرد مرتين)
+    // 4. تصفية الأزرار الصالحة للعب (تأكيد صارم على وجود الأزرار والمعرفات)
     const playableButtons = allButtons.filter(button => {
-      if (button.disabled) return false;
+      if (!button || button.disabled || !button.customId) return false;
       const label = button.label || '';
       if (label.includes('انسحب') || label.includes('طرد مرتين')) return false;
       return true;
     });
 
-    if (playableButtons.length === 0) return { handled: false };
+    if (playableButtons.length === 0) {
+      console.log("⚠️ لا توجد أزرار صالحة للعب في هذه الجولة المحدثة.");
+      return { handled: false };
+    }
 
     // 📊 تصنيف الأزرار المتوفرة إلى 3 مستويات بناءً على طلبك
-    const strangers = [];       // المستوى 1: الأعداء والغرباء (خارج كل القوائم)
+    const strangers = [];       // المستوى 1: الأعداء والغرباء
     const manualWhitelist = [];  // المستوى 2: القائمة المضافة يدوياً (الأصدقاء)
-    const botWhitelist = [];     // المستوى 3: القائمة المشتركة تلقائياً (حساباتك الـ 3)
+    const botWhitelist = [];     // المستوى 3: القائمة المشتركة تلقائياً (حساباتك)
 
     playableButtons.forEach(button => {
       const label = (button.label || '').toLowerCase();
@@ -60,7 +70,7 @@ module.exports = {
         customId.includes(String(bot).toLowerCase()) || label.includes(String(bot).toLowerCase())
       );
 
-      // فحص هل الزر يخص صديق مضاف يدوياً؟
+      // فحص هل الزر يخص صديق مضاف يدوياً?
       const isManual = Array.from(global.whitelistConfig.customUsers).some(user => 
         customId.includes(String(user).toLowerCase()) || label.includes(String(user).toLowerCase())
       );
@@ -79,27 +89,29 @@ module.exports = {
     let strategyLog = '';
 
     if (strangers.length > 0) {
-      // 1. الهدف الأول: طرد الأعداء فوراً طالما هم متواجدون
       targetButton = strangers[Math.floor(Math.random() * strangers.length)];
-      strategyLog = `⚔️ [هجوم] تم استهداف لاعب عدو خارج القائمة البيضاء: [${targetButton.label}]`;
+      strategyLog = `⚔️ [هجوم] تم استهداف لاعب عدو متاح حالياً: [${targetButton.label || 'بدون اسم'}]`;
     } 
     else if (manualWhitelist.length > 0) {
-      // 2. الهدف الثاني: إذا اختفى الأعداء، يتم التضحية بالقائمة اليدوية أولاً لحماية التوكنات الأساسية
       targetButton = manualWhitelist[Math.floor(Math.random() * manualWhitelist.length)];
-      strategyLog = `⚠️ [تضحية حليفة] الأعداء انتهوا! تم طرد حساب من القائمة اليدوية لحماية حسابات البوت: [${targetButton.label}]`;
+      strategyLog = `⚠️ [تضحية حليفة] تم طرد حساب من القائمة اليدوية المتاحة: [${targetButton.label || 'بدون اسم'}]`;
     } 
     else if (botWhitelist.length > 0) {
-      // 3. الهدف الأخير: لم يتبق سوى حساباتك الـ 3، يطردون بعضهم لتستمر اللعبة ويضمن أحدها الفوز
       targetButton = botWhitelist[Math.floor(Math.random() * botWhitelist.length)];
-      strategyLog = `💥 [حرب داخلية] لم يتبق غيرنا على الطاولة! الحسابات تطرد بعضها للاستمرار: [${targetButton.label}]`;
+      strategyLog = `💥 [حرب داخلية] لم يتبق غيرنا! الحساب يطرد توكن حليف متاح: [${targetButton.label || 'بدون اسم'}]`;
     }
 
-    // إذا لم يتم تحديد زر كإجراء وقائي
-    if (!targetButton) return { handled: false };
+    // 5. حماية قصوى: التوقف فوراً إذا كان الهدف غير صالح أو الـ customId مفقود لمنع الـ Timeout
+    if (!targetButton || !targetButton.customId) {
+      console.log("❌ خطأ حرج: تم اختيار زر هدف فارغ أو لا يحتوي على معرف ملموس.");
+      return { handled: false };
+    }
 
-    // تنفيذ الضغط المباشر
+    // تنفيذ الضغط المباشر على الرسالة المحدثة
     console.log(strategyLog);
-    await message.clickButton(targetButton.customId);
+    await freshMessage.clickButton(targetButton.customId).catch(err => {
+      console.error(`❌ فشل إرسال التفاعل للزر المختار: ${err.message}`);
+    });
 
     return {
       handled: true,

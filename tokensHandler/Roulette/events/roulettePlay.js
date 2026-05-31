@@ -3,24 +3,11 @@ module.exports = {
   eventType: 'game_play',
   gameName: 'روليت',
   async execute(message) {
-    // 1. التحقق المبدئي السريع قبل استهلاك الـ API
+    // التحقق الأساسي من بنية الرسالة
     if (!message.author.bot) return { handled: false };
     if (!message.components || message.components.length === 0) return { handled: false };
 
-    // التحقق من أن الدور الحالي هو دور حسابنا
-    const myUserId = message.client.user.id;
-    if (!message.content.includes(`<@${myUserId}>`) && !message.content.includes(`<@!${myUserId}>`)) {
-      return { handled: false };
-    }
-
-    // 2. تحديث بيانات الرسالة فوراً من السيرفر لضمان قراءة الأزرار المتبقية الحقيقية فقط
-    const freshMessage = await message.channel.messages.fetch(message.id).catch(() => null);
-    if (!freshMessage || !freshMessage.components || freshMessage.components.length === 0) {
-      console.log("⚠️ تعذر جلب تحديث الرسالة الحية من السيرفر أو أن الأزرار اختفت بالكامل.");
-      return { handled: false };
-    }
-
-    // تهيئة نظام القائمة البيضاء في الذاكرة المشتركة
+    // 1. 🌟 تسجيل الحسابات الفوري (قبل الفلترة والوعود) لتبادل المعرفة
     if (!global.whitelistConfig) {
       global.whitelistConfig = { botAccounts: new Set(), customUsers: new Set() };
       try {
@@ -34,16 +21,26 @@ module.exports = {
       }
     }
 
-    // الحساب الحالي يسجل نفسه تلقائياً لتعرفه بقية الحسابات
+    // كل حساب يصله الحدث يسجل بياناته كاملة فوراً (ID، اسم المستخدم، اسم العرض)
+    const myUserId = message.client.user.id;
     global.whitelistConfig.botAccounts.add(myUserId);
     if (message.client.user.username) {
       global.whitelistConfig.botAccounts.add(message.client.user.username.toLowerCase());
     }
+    if (message.client.user.displayName) {
+      global.whitelistConfig.botAccounts.add(message.client.user.displayName.toLowerCase());
+    }
+    if (message.client.user.globalName) {
+      global.whitelistConfig.botAccounts.add(message.client.user.globalName.toLowerCase());
+    }
 
-    // 3. تجميع كافة الأزرار الحية الحالية من الرسالة المحدثة
-    const allButtons = freshMessage.components.flatMap(row => row.components);
+    // 2. الفرز الآن: هل الدور الحالي هو دور هذا الحساب بالذات؟
+    if (!message.content.includes(`<@${myUserId}>`) && !message.content.includes(`<@!${myUserId}>`)) {
+      return { handled: false };
+    }
 
-    // 4. تصفية الأزرار الصالحة للعب (تأكيد صارم على وجود الأزرار والمعرفات)
+    // 3. تجميع الأزرار الحالية الحية وتصفيتها
+    const allButtons = message.components.flatMap(row => row.components);
     const playableButtons = allButtons.filter(button => {
       if (!button || button.disabled || !button.customId) return false;
       const label = button.label || '';
@@ -51,28 +48,24 @@ module.exports = {
       return true;
     });
 
-    if (playableButtons.length === 0) {
-      console.log("⚠️ لا توجد أزرار صالحة للعب في هذه الجولة المحدثة.");
-      return { handled: false };
-    }
+    if (playableButtons.length === 0) return { handled: false };
 
-    // 📊 تصنيف الأزرار المتوفرة إلى 3 مستويات بناءً على طلبك
-    const strangers = [];       // المستوى 1: الأعداء والغرباء
-    const manualWhitelist = [];  // المستوى 2: القائمة المضافة يدوياً (الأصدقاء)
-    const botWhitelist = [];     // المستوى 3: القائمة المشتركة تلقائياً (حساباتك)
+    // 📊 تصنيف الأزرار المتوفرة بناءً على القائمة الكاملة والمحدثة
+    const strangers = [];       
+    const manualWhitelist = [];  
+    const botWhitelist = [];     
 
     playableButtons.forEach(button => {
       const label = (button.label || '').toLowerCase();
       const customId = (button.customId || '').toLowerCase();
 
-      // فحص هل الزر يخص أحد حسابات البوت؟
+      // فحص شامل لضمان عدم مباغتة الحسابات الشقيقة
       const isBot = Array.from(global.whitelistConfig.botAccounts).some(bot => 
-        customId.includes(String(bot).toLowerCase()) || label.includes(String(bot).toLowerCase())
+        customId.includes(String(bot)) || label.includes(String(bot))
       );
 
-      // فحص هل الزر يخص صديق مضاف يدوياً?
       const isManual = Array.from(global.whitelistConfig.customUsers).some(user => 
-        customId.includes(String(user).toLowerCase()) || label.includes(String(user).toLowerCase())
+        customId.includes(String(user)) || label.includes(String(user))
       );
 
       if (isBot) {
@@ -90,27 +83,23 @@ module.exports = {
 
     if (strangers.length > 0) {
       targetButton = strangers[Math.floor(Math.random() * strangers.length)];
-      strategyLog = `⚔️ [هجوم] تم استهداف لاعب عدو متاح حالياً: [${targetButton.label || 'بدون اسم'}]`;
+      strategyLog = `⚔️ [هجوم] تم استهداف لاعب عدو: [${targetButton.label || 'بدون اسم'}]`;
     } 
     else if (manualWhitelist.length > 0) {
       targetButton = manualWhitelist[Math.floor(Math.random() * manualWhitelist.length)];
-      strategyLog = `⚠️ [تضحية حليفة] تم طرد حساب من القائمة اليدوية المتاحة: [${targetButton.label || 'بدون اسم'}]`;
+      strategyLog = `⚠️ [تضحية حليفة] الأعداء انتهوا! طرد حساب من القائمة اليدوية: [${targetButton.label || 'بدون اسم'}]`;
     } 
     else if (botWhitelist.length > 0) {
       targetButton = botWhitelist[Math.floor(Math.random() * botWhitelist.length)];
-      strategyLog = `💥 [حرب داخلية] لم يتبق غيرنا! الحساب يطرد توكن حليف متاح: [${targetButton.label || 'بدون اسم'}]`;
+      strategyLog = `💥 [حرب داخلية] لم يتبق غيرنا! الحسابات تطرد بعضها للاستمرار: [${targetButton.label || 'بدون اسم'}]`;
     }
 
-    // 5. حماية قصوى: التوقف فوراً إذا كان الهدف غير صالح أو الـ customId مفقود لمنع الـ Timeout
-    if (!targetButton || !targetButton.customId) {
-      console.log("❌ خطأ حرج: تم اختيار زر هدف فارغ أو لا يحتوي على معرف ملموس.");
-      return { handled: false };
-    }
+    if (!targetButton || !targetButton.customId) return { handled: false };
 
-    // تنفيذ الضغط المباشر على الرسالة المحدثة
+    // تنفيذ الضغط المباشر والسريع
     console.log(strategyLog);
-    await freshMessage.clickButton(targetButton.customId).catch(err => {
-      console.error(`❌ فشل إرسال التفاعل للزر المختار: ${err.message}`);
+    await message.clickButton(targetButton.customId).catch(err => {
+      console.log(`❌ فشل إرسال الضغطة المباشرة للزر: ${err.message}`);
     });
 
     return {

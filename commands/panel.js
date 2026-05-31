@@ -1,48 +1,44 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { MessageActionRow, MessageButton, MessageEmbed } = require('discord.js');
 const { na3san } = require('../config.json');
+const monitorService = require('../services/monitorService');
+const channelConfigService = require('../services/channelConfigService');
 const { getEngines } = require('../services/engineRegistry');
+const { COLORS, ICONS, statusEmbed, chunkButtons, button } = require('../utils/ui');
 
 module.exports = {
   aliases: ['panel'],
-  category: 'لوحة الإدارة',
+  category: 'لوحة العمليات',
   data: new SlashCommandBuilder()
     .setName('لوحة')
-    .setDescription('لوحة الإدارة والمراقبة للحسابات والمحركات'),
+    .setDescription('إرسال لوحة عمليات حيّة بتصميم احترافي'),
   async execute(interaction) {
     if (!na3san.includes(interaction.user.id)) {
-      return interaction.reply({ content: 'ليست لديك صلاحية استخدام هذا الأمر.', ephemeral: true });
+      return interaction.reply({ embeds: [statusEmbed('error', 'صلاحية مرفوضة', ['لا يمكنك نشر لوحة العمليات.'])], ephemeral: true });
     }
 
-    const embed = new MessageEmbed()
-      .setTitle('لوحة الإدارة والمراقبة')
-      .setDescription('اختر إجراءً لإدارة المحركات أو مراقبة الحسابات والسجلات والإحصائيات.');
+    const overview = await monitorService.getSystemOverview();
+    const channels = await channelConfigService.getSettings(interaction.guildId).catch(() => null);
+    const rows = [
+      `**${ICONS.account} الحسابات:** ${overview.totalAccounts} | عاملة: ${overview.activeAccounts} | متوقفة: ${overview.stoppedAccounts}`,
+      `**${ICONS.engine} المحركات:** ${overview.engines.map(e => `${e.name} ${e.activeCount}/${e.enabledCount}`).join(' • ') || 'لا يوجد'}`,
+      `**⚠️ أخطاء آخر ساعة:** ${overview.recentErrors}`,
+      `**${ICONS.channel} قناة عامة:** ${channels && channels.channels.general ? `<#${channels.channels.general}>` : 'غير محددة'}`,
+      'استخدم الأزرار لفتح عروض خاصة، وتشغيل/إيقاف المحركات يتم عبر قائمة حسابات ذكية.'
+    ];
+    const emb = statusEmbed('live', 'مركز العمليات الحي', rows, { footer: 'لوحة مصممة للعرض الإداري — الأحداث المهمة فقط' }).setColor(COLORS.live);
 
-    const engineButtons = getEngines().flatMap(engine => [
-      new MessageButton()
-        .setCustomId(`engine:${engine.id}:on`)
-        .setLabel(`تشغيل ${engine.displayName}`)
-        .setStyle('SUCCESS'),
-      new MessageButton()
-        .setCustomId(`engine:${engine.id}:off`)
-        .setLabel(`إيقاف ${engine.displayName}`)
-        .setStyle('DANGER'),
-    ]);
-
-    const monitorButtons = [
-      new MessageButton().setCustomId('monitor:status').setLabel('الحالة').setStyle('PRIMARY'),
-      new MessageButton().setCustomId('monitor:stats').setLabel('الإحصائيات').setStyle('PRIMARY'),
-      new MessageButton().setCustomId('monitor:logs').setLabel('آخر السجلات').setStyle('SECONDARY'),
-      new MessageButton().setCustomId('monitor:accounts').setLabel('الحسابات').setStyle('SECONDARY'),
+    const buttons = [
+      button('monitor:status', 'الحالة', 'PRIMARY', '🖥️'),
+      button('monitor:stats', 'الإحصائيات', 'PRIMARY', '📊'),
+      button('monitor:logs', 'السجلات', 'SECONDARY', '📜'),
+      button('monitor:accounts', 'الحسابات', 'SECONDARY', '👥'),
+      ...getEngines().flatMap(engine => [
+        button(`engine:${engine.id}:on`, `تشغيل ${engine.displayName}`, 'SUCCESS', '▶️'),
+        button(`engine:${engine.id}:off`, `إيقاف ${engine.displayName}`, 'DANGER', '⏹️'),
+      ]),
     ];
 
-    const rows = [];
-    const buttons = [...engineButtons, ...monitorButtons];
-    for (let index = 0; index < buttons.length; index += 5) {
-      rows.push(new MessageActionRow().addComponents(buttons.slice(index, index + 5)));
-    }
-
-    await interaction.channel.send({ embeds: [embed], components: rows });
-    return interaction.reply({ content: 'تم إرسال لوحة الإدارة والمراقبة بنجاح.', ephemeral: true });
+    await interaction.channel.send({ embeds: [emb], components: chunkButtons(buttons) });
+    return interaction.reply({ embeds: [statusEmbed('success', 'تم نشر لوحة العمليات', ['تم إرسال لوحة احترافية في القناة الحالية.', 'رد الإدارة هذا مخفي لتقليل الضجيج.'])], ephemeral: true });
   },
 };

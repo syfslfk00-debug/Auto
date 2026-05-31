@@ -8,6 +8,7 @@ const { clientId, guildId } = require('./config.json');
 const { connectDatabase } = require('./handlers/database');
 const engineRuntime = require('./services/engineRuntime');
 const eventBus = require('./services/eventBus');
+const notificationService = require('./services/notificationService');
 
 const token = process.env.TOKEN;
 
@@ -41,19 +42,25 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async interaction => {
-	if (!interaction.isCommand()) return;
+    if (!interaction.isCommand() && !(interaction.isAutocomplete && interaction.isAutocomplete())) return;
 
-	const command = client.commands.get(interaction.commandName);
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
 
-	if (!command) return;
+    try {
+        if (interaction.isAutocomplete && interaction.isAutocomplete()) {
+            if (typeof command.autocomplete === 'function') await command.autocomplete(interaction, client);
+            return;
+        }
 
-	try {
-		await command.execute(interaction, client);
-	} catch (error) {
-		console.error(error);
-		await eventBus.publish({ type: 'admin_action_error', level: 'خطأ', status: 'error', message: error.message, details: { command: interaction.commandName, stack: error.stack } }).catch(() => {});
-		await interaction.reply({ content: 'حدث خطأ أثناء تنفيذ هذا الأمر.', ephemeral: true });
-	}
+        await command.execute(interaction, client);
+    } catch (error) {
+        console.error(error);
+        await eventBus.publish({ type: 'admin_action_error', level: 'خطأ', status: 'error', message: error.message, details: { command: interaction.commandName, stack: error.stack } }).catch(() => {});
+        const payload = { content: 'حدث خطأ أثناء تنفيذ هذا الأمر.', ephemeral: true };
+        if (interaction.deferred || interaction.replied) await interaction.followUp(payload).catch(() => {});
+        else await interaction.reply(payload).catch(() => {});
+    }
 });
 
 client.on('unhandledRejection', reason => {
@@ -90,9 +97,10 @@ async function startApplication() {
         await eventBus.publish({ type: 'admin_action_error', level: 'خطأ', status: 'error', message: error.message, details: { action: 'refresh_commands', stack: error.stack } }).catch(() => {});
     }
 
-    await engineRuntime.startAllEngines();
-
     await client.login(token);
+    notificationService.start(client);
+
+    await engineRuntime.startAllEngines();
 }
 
 startApplication().catch(error => {

@@ -8,8 +8,10 @@ const { getEngines, requireEngine } = require('./engineRegistry');
 const activeClients = new Map();
 const activeRounds = new Map();
 
-const winPatterns = ['فوز', 'فزت', 'ربحت', 'نجحت', 'victory', 'won', 'win', 'success'];
-const lossPatterns = ['خسرت', 'خسارة', 'لم تفز', 'fail', 'lost', 'loss', 'game over', 'انتهت المحاولة'];
+const WIN_PHRASE = 'فاز باللعبة';
+const LOSS_PHRASE = 'خسرت';
+const processedOutcomeMessages = new Set();
+const MAX_PROCESSED_OUTCOME_MESSAGES = 1000;
 
 function engineClients(engineId) {
   if (!activeClients.has(engineId)) activeClients.set(engineId, new Map());
@@ -34,6 +36,14 @@ function messageFromArgs(args = []) {
   return args.find(item => item && item.guild && item.channel)
     || args.find(item => item && item.channel)
     || args.find(item => item && item.content);
+}
+
+function outcomeMessageFromArgs(args = []) {
+  for (let index = args.length - 1; index >= 0; index -= 1) {
+    const item = args[index];
+    if (item && item.author && (item.guild || item.channel || item.content || Array.isArray(item.embeds))) return item;
+  }
+  return messageFromArgs(args);
 }
 
 function textFromMessage(message) {
@@ -61,11 +71,33 @@ function contextFromArgs(args = []) {
   };
 }
 
+function rememberProcessedOutcomeMessage(messageId) {
+  if (!messageId) return;
+  processedOutcomeMessages.add(messageId);
+  if (processedOutcomeMessages.size > MAX_PROCESSED_OUTCOME_MESSAGES) {
+    const oldestMessageId = processedOutcomeMessages.values().next().value;
+    processedOutcomeMessages.delete(oldestMessageId);
+  }
+}
+
 function outcomeFromArgs(args = []) {
-  const text = textFromMessage(messageFromArgs(args));
+  const message = outcomeMessageFromArgs(args);
+  if (!message || !message.author || !message.author.bot) return null;
+  if (message.id && processedOutcomeMessages.has(message.id)) return null;
+
+  const text = textFromMessage(message);
   if (!text) return null;
-  if (winPatterns.some(pattern => text.includes(pattern))) return { type: 'game_result', result: 'win', level: 'نجاح', reason: 'رسالة تدل على الفوز' };
-  if (lossPatterns.some(pattern => text.includes(pattern))) return { type: 'game_result', result: 'loss', level: 'خسارة', reason: 'رسالة تدل على الخسارة' };
+
+  if (text.includes(WIN_PHRASE)) {
+    rememberProcessedOutcomeMessage(message.id);
+    return { type: 'game_result', result: 'win', level: 'نجاح', reason: `رسالة بوت تحتوي: ${WIN_PHRASE}`, messageId: message.id };
+  }
+
+  if (text.includes(LOSS_PHRASE)) {
+    rememberProcessedOutcomeMessage(message.id);
+    return { type: 'game_result', result: 'loss', level: 'خسارة', reason: `رسالة بوت تحتوي: ${LOSS_PHRASE}`, messageId: message.id };
+  }
+
   return null;
 }
 
@@ -141,7 +173,7 @@ function outcomeEventFromMessage(event, engine, token, args) {
     status: 'info',
     result: outcome.result,
     gameName: event.gameName || engine.displayName,
-    details: { file: event.fileName, reason: outcome.reason },
+    details: { file: event.fileName, reason: outcome.reason, messageId: outcome.messageId },
   };
 }
 

@@ -9,13 +9,8 @@ const { getEngines, requireEngine } = require('./engineRegistry');
 const activeClients = new Map();
 const activeRounds = new Map();
 
-<<<<<<< HEAD
-const WIN_PHRASE = 'فاز باللعبة';
-const LOSS_PHRASE = 'خسرت';
-=======
 const WIN_PHRASES = ['فاز باللعبة', 'فاز'];
 const LOSS_PHRASES = ['خسرت', 'خسر', 'تم طرد'];
->>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
 const processedOutcomeMessages = new Set();
 const MAX_PROCESSED_OUTCOME_MESSAGES = 1000;
 
@@ -86,11 +81,6 @@ function rememberProcessedOutcomeMessage(messageId) {
   }
 }
 
-<<<<<<< HEAD
-function outcomeFromArgs(args = []) {
-  const message = outcomeMessageFromArgs(args);
-  if (!message || !message.author || !message.author.bot) return null;
-=======
 function playerIdentifiers(account, client, settings) {
   return [
     settings && settings.playerId,
@@ -106,22 +96,11 @@ function outcomeFromArgs(args = [], account, client, settings, policy, engine) {
   const message = outcomeMessageFromArgs(args);
   if (!message || !message.author || !message.author.bot) return null;
   if (!gamePolicyService.isBotAllowed(policy, engine.id, message.author.id)) return null;
->>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
   if (message.id && processedOutcomeMessages.has(message.id)) return null;
 
   const text = textFromMessage(message);
   if (!text) return null;
 
-<<<<<<< HEAD
-  if (text.includes(WIN_PHRASE)) {
-    rememberProcessedOutcomeMessage(message.id);
-    return { type: 'game_result', result: 'win', level: 'نجاح', reason: `رسالة بوت تحتوي: ${WIN_PHRASE}`, messageId: message.id };
-  }
-
-  if (text.includes(LOSS_PHRASE)) {
-    rememberProcessedOutcomeMessage(message.id);
-    return { type: 'game_result', result: 'loss', level: 'خسارة', reason: `رسالة بوت تحتوي: ${LOSS_PHRASE}`, messageId: message.id };
-=======
   const identifiers = playerIdentifiers(account, client, settings);
   if (identifiers.length === 0 || !identifiers.some(identifier => text.includes(identifier))) return null;
 
@@ -135,7 +114,6 @@ function outcomeFromArgs(args = [], account, client, settings, policy, engine) {
   if (lossPhrase) {
     rememberProcessedOutcomeMessage(message.id);
     return { type: 'game_result', result: 'loss', level: 'خسارة', reason: `رسالة بوت مسموح تحتوي: ${lossPhrase}`, messageId: message.id };
->>>>>>> codex/redesign-commands-and-interfaces-for-discord-bot
   }
 
   return null;

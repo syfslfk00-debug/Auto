@@ -1,96 +1,89 @@
 module.exports = {
+  // تم تغيير الاسم ليعبر عن الوظيفة، ولكن يفضل ربطه بحدثين في ملف التشغيل الرئيسي لديك
   name: 'messageCreate', 
   eventType: 'game_join',
   gameName: 'روليت',
-  async execute(arg1, arg2) {
-    console.log("====================================");
-    console.log("🤖 [روليت] تم استدعاء ملف الدخول، جاري الفحص...");
+  async execute(oldMessage, newMessage) {
+    // لدعم حدث messageUpdate و messageCreate معاً
+    // في حال كان الحدث messageCreate سيكون oldMessage هو الرسالة الحقيقية
+    // في حال كان messageUpdate سيكون newMessage هو الرسالة المحدثة
+    const message = newMessage || oldMessage;
 
-    // نظام فحص ذكي لتحديد كائن الرسالة الصحيح مهما كانت طريقة تمرير الأحداث
-    let message = [arg1, arg2].find(arg => arg && (arg.components || arg.embeds || arg.content) && arg.author?.bot);
-    
-    if (!message) {
-      console.log("❌ لم يتم العثور على كائن الرسالة الصحيح في المعاملات (تأكد من الـ index.js).");
-      return { handled: false };
-    }
+    if (!message || !message.author) return { handled: false };
+    if (!message.author.bot) return { handled: false };
 
-    if (!message.author.bot) {
-      console.log("⏭️ الرسالة ليست من بوت، تم التخطي.");
-      return { handled: false };
-    }
-
-    // تجميع النصوص للتأكد من اسم اللعبة
+    // تجميع النصوص من محتوى الرسالة العادي
     let allTexts = [];
     if (message.content) allTexts.push(message.content);
 
+    // تجميع النصوص من الإيمبد مع دعم v13 و v14
     if (message.embeds && message.embeds.length > 0) {
       const embed = message.embeds[0];
-      const embedData = embed.data || embed;
+      const embedData = embed.data || embed; // يضمن التوافق مع الإصدارين
+
       if (embedData.title) allTexts.push(embedData.title);
       if (embedData.description) allTexts.push(embedData.description);
+      if (embedData.fields) {
+        for (const field of embedData.fields) {
+          if (field.name) allTexts.push(field.name);
+          if (field.value) allTexts.push(field.value);
+        }
+      }
+      if (embedData.footer && embedData.footer.text) allTexts.push(embedData.footer.text);
+      if (embedData.author && embedData.author.name) allTexts.push(embedData.author.name);
     }
 
+    // البحث عن "روليت" أو "العجلة" في جميع النصوص المجموعة
     const hasGameName = allTexts.some(text =>
       text.includes('روليت') || text.includes('العجلة')
     );
+    if (!hasGameName) return { handled: false };
 
-    if (!hasGameName) {
-      console.log("⏭️ النصوص لا تحتوي على كلمة (روليت أو العجلة)، تم التخطي.");
-      return { handled: false };
+    const components = message.components;
+    if (!components || components.length === 0) return { handled: false };
+
+    // محاولة العثور على زر انضمام يحمل كلمة "دخول" أو "عشوائي"
+    let targetButton = null;
+    for (const row of components) {
+      for (const button of row.components) {
+        if (button.disabled) continue;
+        const label = button.label || '';
+        if (label.includes('دخول') || label.includes('عشوائي')) {
+          targetButton = button;
+          break;
+        }
+      }
+      if (targetButton) break;
     }
 
-    console.log("🎯 [نجاح] تم رصد رسالة لعبة الروليت! جاري فحص الأزرار...");
-
-    if (!message.components || message.components.length === 0) {
-      console.log("⚠️ غريب! تم رصد الرسالة ولكن لا توجد أزرار (ربما لم تُحمل بعد).");
-      return { handled: false };
-    }
-
-    // تسطيح جميع الأزرار من كافة الصفوف في مصفوفة واحدة
-    const allButtons = message.components.flatMap(row => row.components);
-    console.log(`📊 إجمالي الأزرار المكتشفة في الرسالة: ${allButtons.length} زر.`);
-
-    // البحث عن أول زر متاح (رقمي) مع استبعاد أزرار التحكم الخاطئة
-    const targetButton = allButtons.find(button => {
-      if (button.disabled) return false;
-      const label = button.label || '';
-      // استبعاد أزرار الخروج والمتجر لضمان الضغط على رقم مباشر
-      if (label.includes('اخرج') || label.includes('متجر')) return false;
-      return true;
-    });
-
+    // إذا لم نجد، نأخذ أول زر غير معطل في الصف الأول
     if (!targetButton) {
-      console.log("❌ لم يتم العثور على أي زر متاح للضغط (قد تكون الغرفة ممتلئة بالكامل).");
-      return { handled: false };
+      const firstRow = components[0];
+      if (firstRow && firstRow.components.length > 0) {
+        for (const button of firstRow.components) {
+          if (!button.disabled) {
+            targetButton = button;
+            break;
+          }
+        }
+      }
     }
 
-    console.log(`✅ تم اختيار الزر بنجاح! النص عليه هو: [${targetButton.label || 'رقم'}]`);
+    if (!targetButton) return { handled: false };
 
-    // استدعاء دالة الضغط مع التأخير الزمني لحل مشكلة الـ Click المرفوض
-    return await clickWithDelay(message, targetButton);
+    try {
+      // التأكد من أن مكتبة السيلف بوت تدعم هذه الدالة على كائن الرسالة
+      await message.clickButton(targetButton.customId);
+      return {
+        handled: true,
+        type: 'game_join',
+        result: 'join',
+        gameName: 'روليت',
+        message: 'تم دخول لعبة روليت بنجاح.',
+      };
+    } catch (error) {
+      console.error("خطأ أثناء محاولة الضغط على الزر:", error);
+      return { handled: false };
+    }
   },
 };
-
-// دالة تفصل الضغط وتمنحه وقتاً للاستقرار
-async function clickWithDelay(message, button) {
-  const delayMs = 700; // تأخير 700 ملي ثانية لضمان استقرار الرسالة في ديسكورد
-  console.log(`⏱️ جاري الانتظار لمدة ${delayMs}ms قبل الضغط لضمان قبول العملية...`);
-  
-  await new Promise(resolve => setTimeout(resolve, delayMs));
-
-  try {
-    // محاولة الضغط السحرية
-    await message.clickButton(button.customId);
-    console.log(`🚀 [مبهر] تم إرسال ضغطة الزر بنجاح إلى ديسكورد!`);
-    return {
-      handled: true,
-      type: 'game_join',
-      result: 'join',
-      gameName: 'روليت',
-      message: `تم الانضمام للعبة عبر زر الرقم المتاح.`,
-    };
-  } catch (error) {
-    console.error("❌ فشلت مكتبة السيلف بوت في الضغط على الزر، السبب:", error.message);
-    return { handled: false };
-  }
-}

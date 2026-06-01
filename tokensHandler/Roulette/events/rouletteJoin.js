@@ -79,8 +79,8 @@ module.exports = {
 // دالة الضغط بنظام التوقيت العشوائي (التمويه البشري)
 async function clickWithHumanDelay(message, button) {
   // توليد تأخير عشوائي بين 500 ملي ثانية (نصف ثانية) و 1200 ملي ثانية (ثانية وربع)
-  const minDelay = 500;
-  const maxDelay = 1200;
+  const minDelay = 1000;
+  const maxDelay = 2000;
   const delayMs = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
   
   console.log(`⏱️ محاكاة حركة البشر: سينتظر البوت مدة عشوائية قدرها ${delayMs}ms قبل إرسال الضغطة...`);

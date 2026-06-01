@@ -31,7 +31,7 @@ module.exports = {
     }
 
     // معرف البوت الجديد الثابت (يُستبدل بالمعرف الحقيقي)
-    const NEW_BOT_ID = '1006332825571692544'; // ←    
+    const NEW_BOT_ID = 'ID_البوت_الجديد_هنا'; // ← استبدل بمعرف البوت الجديد
 
     // تحديد الكلمات المفتاحية المناسبة لكل بوت
     const isNewBot = message.author.id === NEW_BOT_ID;
@@ -49,29 +49,31 @@ module.exports = {
     }
 
     console.log("🎯 [نجاح] تم رصد رسالة لعبة الروليت! جاري فرز الخانات الشاغرة...");
+    console.log(`🆔 [معلومة] مرسل الرسالة ID: ${message.author.id} | NEW_BOT_ID: ${NEW_BOT_ID} | isNewBot: ${isNewBot}`);
 
     // تحقق أولي من وجود الأزرار
     if (!message.components || message.components.length === 0) {
       if (isNewBot) {
-        // بالنسبة للبوت الجديد، قد يتأخر ظهور الأزرار (تعديل الرسالة)، ننتظر قليلاً ونحاول مجدداً
-        console.log("⏳ [بوت جديد] الأزرار لم تظهر بعد، جاري الانتظار 3 ثوانٍ للتحقق من التحديثات...");
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        // إعادة فحص نفس الرسالة بعد الانتظار (قد تكون حُدثت)
-        try {
-          // نحاول جلب الرسالة المحدثة من الشانيل (إذا كانت متاحة)
-          if (message.channel && message.id) {
-            const updatedMessage = await message.channel.messages.fetch(message.id).catch(() => null);
-            if (updatedMessage && updatedMessage.components && updatedMessage.components.length > 0) {
-              message = updatedMessage; // نستخدم الرسالة المحدثة
-              console.log("🔄 [بوت جديد] تم تحديث الرسالة وظهرت الأزرار.");
+        console.log("⏳ [بوت جديد] الأزرار لم تظهر بعد، جاري الانتظار حتى 9 ثوانٍ مع إعادة الجلب...");
+        // ننتظر بحد أقصى 3 مرات * 3 ثوانٍ
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          try {
+            if (message.channel && message.id) {
+              const updatedMessage = await message.channel.messages.fetch(message.id).catch(() => null);
+              if (updatedMessage && updatedMessage.components && updatedMessage.components.length > 0) {
+                message = updatedMessage;
+                console.log(`🔄 [بوت جديد] تم تحديث الرسالة وظهرت الأزرار بعد المحاولة ${attempt}.`);
+                break;
+              }
             }
+          } catch (e) {
+            console.log(`⚠️ محاولة ${attempt} لجلب التحديث فشلت، نتابع...`);
           }
-        } catch (e) {
-          console.log("⚠️ لم نتمكن من جلب التحديث، نتابع بالرسالة الحالية.");
         }
       }
       
-      // فحص مجدد بعد المحاولة
+      // فحص مجدد بعد المحاولات
       if (!message.components || message.components.length === 0) {
         console.log("⚠️ لا توجد أزرار متوفرة في الرسالة بعد.");
         return { handled: false };

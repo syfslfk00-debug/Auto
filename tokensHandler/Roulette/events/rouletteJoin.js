@@ -6,7 +6,7 @@ module.exports = {
     console.log("====================================");
     console.log("🤖 [روليت] تم استدعاء ملف الدخول، جاري الفحص...");
 
-    // نظام فحص ذكي لتحديد كائن الرسالة الصحيح مهما كانت طريقة تمرير الأحداث
+    // نظام فحص ذكي لتحديد كائن الرسالة الصحيح
     let message = [arg1, arg2].find(arg => arg && (arg.components || arg.embeds || arg.content) && arg.author?.bot);
     
     if (!message) {
@@ -15,7 +15,6 @@ module.exports = {
     }
 
     if (!message.author.bot) {
-      console.log("⏭️ الرسالة ليست من بوت، تم التخطي.");
       return { handled: false };
     }
 
@@ -31,25 +30,36 @@ module.exports = {
     }
 
     const hasGameName = allTexts.some(text =>
-      text.includes('روليت') || text.includes('المشاركين')
+      text.includes('روليت') || text.includes('العجلة')
     );
 
     if (!hasGameName) {
-      console.log("⏭️ النصوص لا تحتوي على كلمة (روليت أو العجلة)، تم التخطي.");
       return { handled: false };
     }
 
-    console.log("🎯 [نجاح] تم رصد رسالة لعبة الروليت! جاري فرز الخانات الشاغرة...");
+    console.log("🎯 [نجاح] تم رصد رسالة لعبة الروليت!");
+
+    // 🔄 تأمين جلب الأزرار في حال تأخر ظهورها بالرسالة
+    if (!message.components || message.components.length === 0) {
+      console.log("⏳ الأزرار لم تظهر بعد في الكاش، جاري الانتظار (500ms) وتحديث الرسالة...");
+      await new Promise(resolve => setTimeout(resolve, 500)); 
+      try {
+        message = await message.channel.messages.fetch(message.id);
+      } catch (error) {
+        console.log("❌ فشل تحديث الرسالة من السيرفر:", error.message);
+        return { handled: false };
+      }
+    }
 
     if (!message.components || message.components.length === 0) {
-      console.log("⚠️ غريب! لا توجد أزرار متوفرة في الرسالة.");
+      console.log("⚠️ لا توجد أزرار متوفرة للتفاعل في هذه الرسالة حالياً.");
       return { handled: false };
     }
 
-    // تسطيح جميع الأزرار من كافة الصفوف في مصفوفة واحدة
+    // تسطيح جميع الأزرار من كافة الصفوف
     const allButtons = message.components.flatMap(row => row.components);
 
-    // 🔍 الفحص الفاصل: هل اللوبي يعتمد على أرقام خانات (فيزبو) أم أزرار تحكم مباشرة (كلوفر)؟
+    // 🔍 الفحص البرمجي: هل اللوبي يعتمد على أرقام خانات أم زر دخول مباشر؟
     const isNumberedLobby = allButtons.some(button => {
       const label = (button.label || '').trim();
       return /^\d+$/.test(label);
@@ -57,9 +67,9 @@ module.exports = {
 
     if (isNumberedLobby) {
       // =============================================================
-      // 1. نظام بوت فيزبو الحالي (متروك تماماً كما هو دون أي تغيير)
+      // 1. نظام اللوبي المعتمد على الأرقام والخانات
       // =============================================================
-      console.log("📝 [روليت] تم رصد لوبي يعتمد على الأرقام (بوت فيزبو الحالي).");
+      console.log("📝 [روليت] تم رصد نظام اللوبي الرقمي (خانات شاغرة).");
 
       const availableButtons = allButtons.filter(button => {
         if (button.disabled) return false;
@@ -69,61 +79,56 @@ module.exports = {
       });
 
       if (availableButtons.length === 0) {
-        console.log("❌ لم يتم العثور على أي رقم شاغر للضغط (اللوبي ممتلئ بالكامل).");
+        console.log("❌ اللوبي ممتلئ بالكامل (لا توجد أرقام شاغرة).");
         return { handled: false };
       }
-
-      console.log(`📊 عدد الأرقام الشاغرة المتاحة حالياً: ${availableButtons.length} خانة.`);
 
       const randomIndex = Math.floor(Math.random() * availableButtons.length);
       const targetButton = availableButtons[randomIndex];
 
-      console.log(`🎲 نظام الحماية اختار لك الرقم: [${targetButton.label}] بشكل عشوائي.`);
-
-      return await clickWithHumanDelay(message, targetButton);
+      console.log(`🎲 تم اختيار الخانة الرقمية: [${targetButton.label}] عشوائياً.`);
+      return await clickWithHumanDelay(message, targetButton, `الخانة الرقمية ${targetButton.label}`);
 
     } else {
       // =============================================================
-      // 2. النظام المخصص لبوت كلوفر (الاعتماد على أول زر في الصف كما في IMG_6361.jpg)
+      // 2. نظام اللوبي المعتمد على زر الانضمام المباشر (أول زر في الصف)
       // =============================================================
-      console.log("🟢 [روليت] تم رصد لوبي انضمام مباشر (بوت كلوفر).");
+      console.log("🟢 [روليت] تم رصد نظام الانضمام المباشر (عبر زر التفاعل الأول).");
 
-      // الاعتماد المباشر على أول زر متاح في المصفوفة (الزر الأخضر في أقصى اليسار بالصورة)
       const joinButton = allButtons[0];
 
       if (!joinButton || joinButton.disabled) {
-        console.log("❌ زر الانضمام الأول غير موجود أو معطل حالياً.");
+        console.log("❌ زر الانضمام المباشر غير متاح أو معطل.");
         return { handled: false };
       }
 
-      console.log("🎲 تم اختيار أول زر في الصف للانضمام (زر الايموجي الأخضر).");
-      return await clickWithHumanDelay(message, joinButton);
+      console.log("🎲 جاري الضغط على زر الدخول الأول في الصف.");
+      return await clickWithHumanDelay(message, joinButton, "زر الانضمام المباشر");
     }
   },
 };
 
-// دالة الضغط بنظام التوقيت العشوائي (التمويه البشري)
-async function clickWithHumanDelay(message, button) {
-  const minDelay = 500;
-  const maxDelay = 1200;
+// دالة الضغط بنظام التمويه والتوقيت البشري العشوائي
+async function clickWithHumanDelay(message, button, buttonTypeLabel) {
+  const minDelay = 400;
+  const maxDelay = 950;
   const delayMs = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
   
-  console.log(`⏱️ محاكاة حركة البشر: سينتظر البوت مدة عشوائية قدرها ${delayMs}ms قبل إرسال الضغطة...`);
-  
+  console.log(`⏱️ محاكاة حركة بشرية: الانتظار لمدة ${delayMs}ms قبل الضغط...`);
   await new Promise(resolve => setTimeout(resolve, delayMs));
 
   try {
     await message.clickButton(button.customId);
-    console.log(`🚀 [ممتاز] تم الضغط على زر الدخول [${button.label || 'Emoji Button'}] بنجاح!`);
+    console.log(`🚀 [ممتاز] تم الدخول بنجاح عبر (${buttonTypeLabel})!`);
     return {
       handled: true,
       type: 'game_join',
       result: 'join',
       gameName: 'روليت',
-      message: `تم الدخول بنجاح عبر الزر الأول.`,
+      message: `تم الدخول بنجاح عبر ${buttonTypeLabel}.`,
     };
   } catch (error) {
-    console.error("❌ فشلت محاولة الضغط، السبب:", error.message);
+    console.error("❌ فشلت محاولة الضغط على الزر، السبب:", error.message);
     return { handled: false };
   }
 }

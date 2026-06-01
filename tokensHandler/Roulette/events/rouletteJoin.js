@@ -49,7 +49,7 @@ module.exports = {
     // تسطيح جميع الأزرار من كافة الصفوف في مصفوفة واحدة
     const allButtons = message.components.flatMap(row => row.components);
 
-    // 🔍 الفحص الفاصل: هل اللوبي يعتمد على أرقام خانات (فيزبو) أم أزرار تحكم مباشرة (كلوفر والمستقبلية)؟
+    // 🔍 الفحص الفاصل: هل اللوبي يعتمد على أرقام خانات (فيزبو) أم أزرار تحكم مباشرة (كلوفر)؟
     const isNumberedLobby = allButtons.some(button => {
       const label = (button.label || '').trim();
       return /^\d+$/.test(label);
@@ -57,15 +57,13 @@ module.exports = {
 
     if (isNumberedLobby) {
       // =============================================================
-      // 1. نظام بوت فيزبو الحالي (متروك تماماً كما هو دون أي تغيير للحفاظ على الاستقرار)
+      // 1. نظام بوت فيزبو الحالي (متروك تماماً كما هو دون أي تغيير)
       // =============================================================
       console.log("📝 [روليت] تم رصد لوبي يعتمد على الأرقام (بوت فيزبو الحالي).");
 
-      // تجميع كاااافة الأزرار الرقمية المتاحة (الخانات غير المحجوزة)
       const availableButtons = allButtons.filter(button => {
         if (button.disabled) return false;
         const label = button.label || '';
-        // استبعاد أزرار التحكم الخاطئة
         if (label.includes('اخرج') || label.includes('متجر')) return false;
         return true;
       });
@@ -77,56 +75,28 @@ module.exports = {
 
       console.log(`📊 عدد الأرقام الشاغرة المتاحة حالياً: ${availableButtons.length} خانة.`);
 
-      // 🎲 التمويه العشوائي: اختيار زر عشوائي تماماً من قائمة الخانات المتاحة
       const randomIndex = Math.floor(Math.random() * availableButtons.length);
       const targetButton = availableButtons[randomIndex];
 
       console.log(`🎲 نظام الحماية اختار لك الرقم: [${targetButton.label}] بشكل عشوائي.`);
 
-      // استدعاء دالة الضغط التلقائي مع التأخير البشري المتغير
       return await clickWithHumanDelay(message, targetButton);
 
     } else {
       // =============================================================
-      // 2. النظام الجديد الداعم لبوت (كلوفر) والبوتات المستقبلية (دخول مباشر)
+      // 2. النظام المخصص لبوت كلوفر (الاعتماد على أول زر في الصف كما في IMG_6361.jpg)
       // =============================================================
-      console.log("🟢 [روليت] تم رصد لوبي يعتمد على زر انضمام مباشر (بوت كلوفر / بوتات مستقبلية).");
+      console.log("🟢 [روليت] تم رصد لوبي انضمام مباشر (بوت كلوفر).");
 
-      // البحث الذكي عن زر الانضمام عبر اللون الأخضر (SUCCESS) أو الكلمات الدلالية مع استبعاد أزرار التحكم الأخرى
-      const joinButton = allButtons.find(button => {
-        if (button.disabled) return false;
-        const label = button.label || '';
-        const style = button.style;
+      // الاعتماد المباشر على أول زر متاح في المصفوفة (الزر الأخضر في أقصى اليسار بالصورة)
+      const joinButton = allButtons[0];
 
-        // استبعاد صارم لأزرار التحكم لمنع التداخل والتشابك البرمجي
-        if (label.includes('اخرج') || label.includes('متجر') || label.includes('حقيبت')) return false;
-
-        // التحقق من زر الدخول: إما أن يكون ستايل الزر أخضر (3 أو SUCCESS) أو يحتوي على نصوص صريحة
-        if (style === 3 || style === 'SUCCESS') return true;
-        if (label.includes('دخول') || label.includes('انضم') || label.includes('مشاركة')) return true;
-
-        return false;
-      });
-
-      if (!joinButton) {
-        // حماية احتياطية للمستقبل: إذا لم يطابق الفلتر الذكي، نأخذ أول زر نشط غير مستبعد
-        const fallbackButton = allButtons.find(button => {
-          if (button.disabled) return false;
-          const label = button.label || '';
-          if (label.includes('اخرج') || label.includes('متجر') || label.includes('حقيبت')) return false;
-          return true;
-        });
-
-        if (!fallbackButton) {
-          console.log("❌ لم يتم العثور على أي زر صالح للانضمام المباشر في هذا اللوبي.");
-          return { handled: false };
-        }
-
-        console.log(`🎲 نظام الحماية اختار زر الدخول الاحتياطي: [${fallbackButton.label || 'أيقونة الدخول'}]`);
-        return await clickWithHumanDelay(message, fallbackButton);
+      if (!joinButton || joinButton.disabled) {
+        console.log("❌ زر الانضمام الأول غير موجود أو معطل حالياً.");
+        return { handled: false };
       }
 
-      console.log(`🎲 نظام الحماية رصد زر الانضمام المباشر بنجاح: [${joinButton.label || 'أيقونة الدخول الخضراء'}]`);
+      console.log("🎲 تم اختيار أول زر في الصف للانضمام (زر الايموجي الأخضر).");
       return await clickWithHumanDelay(message, joinButton);
     }
   },
@@ -134,7 +104,6 @@ module.exports = {
 
 // دالة الضغط بنظام التوقيت العشوائي (التمويه البشري)
 async function clickWithHumanDelay(message, button) {
-  // توليد تأخير عشوائي بين 500 ملي ثانية (نصف ثانية) و 1200 ملي ثانية (ثانية وربع)
   const minDelay = 500;
   const maxDelay = 1200;
   const delayMs = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
@@ -144,18 +113,17 @@ async function clickWithHumanDelay(message, button) {
   await new Promise(resolve => setTimeout(resolve, delayMs));
 
   try {
-    // إرسال الضغطة إلى ديسكورد
     await message.clickButton(button.customId);
-    console.log(`🚀 [ممتاز] تم حجز الرقم [${button.label || 'زر الدخول'}] والدخول إلى اللعبة بنجاح تمويهي كامل!`);
+    console.log(`🚀 [ممتاز] تم الضغط على زر الدخول [${button.label || 'Emoji Button'}] بنجاح!`);
     return {
       handled: true,
       type: 'game_join',
       result: 'join',
       gameName: 'روليت',
-      message: `تم الدخول عشوائياً بالرقم: ${button.label || 'زر الدخول'}`,
+      message: `تم الدخول بنجاح عبر الزر الأول.`,
     };
   } catch (error) {
-    console.error("❌ فشلت محاولة الضغط العشوائي، السبب:", error.message);
+    console.error("❌ فشلت محاولة الضغط، السبب:", error.message);
     return { handled: false };
   }
 }

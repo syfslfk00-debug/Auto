@@ -31,7 +31,7 @@ module.exports = {
     }
 
     const hasGameName = allTexts.some(text =>
-      text.includes('روليت') || text.includes('العجلة')
+      text.includes('روليت') || text.includes('المشاركين')
     );
 
     if (!hasGameName) {

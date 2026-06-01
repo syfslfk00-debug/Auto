@@ -96,8 +96,36 @@ module.exports = {
 
     if (!targetButton || !targetButton.customId) return { handled: false };
 
-    // تنفيذ الضغط المباشر والسريع
-    console.log(strategyLog);
+    // ============ 🔁 آليات محاكاة البشر (التعديلات المطلوبة) ============
+    // ثوابت قابلة للتعديل
+    const MIN_DELAY_MS = 800;                // الحد الأدنى للتأخير الطبيعي
+    const MAX_DELAY_MS = 2500;               // الحد الأقصى للتأخير الطبيعي
+    const SKIP_PROBABILITY = 0.01;           // احتمال تخطي الدور (5%)
+    const EXTRA_LONG_DELAY_PROB = 0.10;      // احتمال إضافة تأخير أطول (10%)
+    const EXTRA_LONG_DELAY_MS_MIN = 3000;
+    const EXTRA_LONG_DELAY_MS_MAX = 6000;
+
+    // احتمال التخطي الكامل للدور (محاكاة التردد أو الانشغال)
+    if (Math.random() < SKIP_PROBABILITY) {
+      console.log(`🧑 [محاكاة بشرية] تخطي الدور: ${strategyLog}`);
+      return { handled: false }; // لا يتم الضغط على الزر كأن البوت لم يلاحظ
+    }
+
+    // حساب التأخير الأساسي العشوائي
+    let delay = Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS + 1)) + MIN_DELAY_MS;
+
+    // أحياناً إضافة تأخير أطول (محاكاة التشتت أو كتابة رد)
+    if (Math.random() < EXTRA_LONG_DELAY_PROB) {
+      const extra = Math.floor(Math.random() * (EXTRA_LONG_DELAY_MS_MAX - EXTRA_LONG_DELAY_MS_MIN + 1)) + EXTRA_LONG_DELAY_MS_MIN;
+      delay += extra;
+      console.log(`⏳ [محاكاة بشرية] إضافة تأخير أطول بمقدار ${extra}ms`);
+    }
+
+    console.log(`⏱️ [محاكاة بشرية] انتظار ${delay}ms قبل الضغط على الزر: ${strategyLog}`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    // ================================================================
+
+    // تنفيذ الضغط بعد الانتهاء من المحاكاة البشرية
     await message.clickButton(targetButton.customId).catch(err => {
       console.log(`❌ فشل إرسال الضغطة المباشرة للزر: ${err.message}`);
     });

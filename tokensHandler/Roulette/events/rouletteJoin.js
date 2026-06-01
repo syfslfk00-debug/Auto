@@ -30,20 +30,52 @@ module.exports = {
       if (embedData.description) allTexts.push(embedData.description);
     }
 
+    // معرف البوت الجديد الثابت (يُستبدل بالمعرف الحقيقي)
+    const NEW_BOT_ID = '1006332825571692544'; // ←    
+
+    // تحديد الكلمات المفتاحية المناسبة لكل بوت
+    const isNewBot = message.author.id === NEW_BOT_ID;
+    const keywordChecks = isNewBot
+      ? ['اللعبة', 'العجلة', 'المشاركين'] // الكلمات الخاصة بالبوت الجديد
+      : ['روليت', 'العجلة'];              // الكلمات الخاصة بفيزبو (القديم)
+
     const hasGameName = allTexts.some(text =>
-      text.includes('روليت') || text.includes('العجلة')
+      keywordChecks.some(keyword => text.includes(keyword))
     );
 
     if (!hasGameName) {
-      console.log("⏭️ النصوص لا تحتوي على كلمة (روليت أو العجلة)، تم التخطي.");
+      console.log("⏭️ النصوص لا تحتوي على الكلمات المطلوبة، تم التخطي.");
       return { handled: false };
     }
 
     console.log("🎯 [نجاح] تم رصد رسالة لعبة الروليت! جاري فرز الخانات الشاغرة...");
 
+    // تحقق أولي من وجود الأزرار
     if (!message.components || message.components.length === 0) {
-      console.log("⚠️ غريب! لا توجد أزرار متوفرة في الرسالة.");
-      return { handled: false };
+      if (isNewBot) {
+        // بالنسبة للبوت الجديد، قد يتأخر ظهور الأزرار (تعديل الرسالة)، ننتظر قليلاً ونحاول مجدداً
+        console.log("⏳ [بوت جديد] الأزرار لم تظهر بعد، جاري الانتظار 3 ثوانٍ للتحقق من التحديثات...");
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        // إعادة فحص نفس الرسالة بعد الانتظار (قد تكون حُدثت)
+        try {
+          // نحاول جلب الرسالة المحدثة من الشانيل (إذا كانت متاحة)
+          if (message.channel && message.id) {
+            const updatedMessage = await message.channel.messages.fetch(message.id).catch(() => null);
+            if (updatedMessage && updatedMessage.components && updatedMessage.components.length > 0) {
+              message = updatedMessage; // نستخدم الرسالة المحدثة
+              console.log("🔄 [بوت جديد] تم تحديث الرسالة وظهرت الأزرار.");
+            }
+          }
+        } catch (e) {
+          console.log("⚠️ لم نتمكن من جلب التحديث، نتابع بالرسالة الحالية.");
+        }
+      }
+      
+      // فحص مجدد بعد المحاولة
+      if (!message.components || message.components.length === 0) {
+        console.log("⚠️ لا توجد أزرار متوفرة في الرسالة بعد.");
+        return { handled: false };
+      }
     }
 
     // تسطيح جميع الأزرار من كافة الصفوف في مصفوفة واحدة
@@ -63,11 +95,8 @@ module.exports = {
       return { handled: false };
     }
 
-    // 🟢 معرف البوت الجديد الثابت (يُستبدل بالمعرف الحقيقي)
-    const NEW_BOT_ID = '1006332825571692544'; // ←  
-
-    // إذا كان البوت المرسل هو البوت الجديد، نضغط على أول زر متاح (زر الدخول)
-    if (message.author.id === NEW_BOT_ID) {
+    // إذا كان البوت الجديد، نضغط على أول زر متاح (زر الدخول)
+    if (isNewBot) {
       const joinButton = availableButtons[0]; // الزر الوحيد المتاح
       console.log(`🎯 [بوت جديد] سيتم الضغط على زر الدخول: [${joinButton.label || 'بدون نص'}]`);
       return await clickWithHumanDelay(message, joinButton);

@@ -4,6 +4,7 @@ const { Client } = require('discord.js-selfbot-v13');
 const tokenService = require('./tokenService');
 const eventBus = require('./eventBus');
 const gamePolicyService = require('./gamePolicyService');
+const channelConfigService = require('./channelConfigService');
 const { getEngines, requireEngine } = require('./engineRegistry');
 
 const activeClients = new Map();
@@ -332,7 +333,13 @@ async function startEngineToken(engineId, token) {
     console.error(`[EngineRuntime] ${engine.id} client error:`, safeError(error));
   });
 
-  loadEngineEvents(client, engine, token, settings, account);
+  const runtimeSettings = { ...(settings || {}) };
+  if (engine.id === 'zar' && account && account.name) {
+    runtimeSettings.zarChannel = await channelConfigService.getZarChannelForAccount(account.name).catch(() => null);
+  }
+  client.engineContext = { engine, token, settings: runtimeSettings, account };
+
+  loadEngineEvents(client, engine, token, runtimeSettings, account);
 
   try {
     await client.login(token);
@@ -346,7 +353,7 @@ async function startEngineToken(engineId, token) {
       status: 'running',
       result: 'started',
       gameName: engine.displayName,
-      details: { settings: settings || {} },
+      details: { settings: runtimeSettings || {} },
     });
     console.log(`[EngineRuntime] ${engine.id} token ${token.substring(0, 10)}... started successfully.`);
     return client;

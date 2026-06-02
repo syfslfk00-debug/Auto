@@ -4,7 +4,7 @@ const client = new Client({ intents: ['GUILDS', 'GUILD_MEMBERS', 'GUILD_MESSAGES
 const fs = require('fs');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
-const { clientId, guildId } = require('./config.json');
+const { clientId } = require('./config.json');
 const { connectDatabase } = require('./handlers/database');
 const engineRuntime = require('./services/engineRuntime');
 const eventBus = require('./services/eventBus');
@@ -106,7 +106,7 @@ async function startApplication() {
     try {
     console.log('بدأ تحديث أوامر التطبيق.');
         await rest.put(
-            Routes.applicationGuildCommands(clientId, guildId),
+            Routes.applicationCommands(clientId),
             { body: commands },
         );
     console.log('تم تحديث أوامر التطبيق بنجاح.');

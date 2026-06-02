@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
+const { MessageActionRow, Modal, TextInputComponent } = require('discord.js');
 const { na3san } = require('../config.json');
 const tokenService = require('../services/tokenService');
 const engineRuntime = require('../services/engineRuntime');
@@ -42,6 +43,7 @@ module.exports = {
     .addSubcommand(sc => sc.setName('مراقبة').setDescription('ملخص حي لحالة النظام'))
     .addSubcommand(sc => sc.setName('قناة-تعيين').setDescription('تعيين قناة عامة أو قناة محرك أو حساب').addStringOption(o => o.setName('النطاق').setDescription('نوع مسار الأحداث').setRequired(true).addChoices({ name: 'عام', value: 'general' }, { name: 'محرك', value: 'engine' }, { name: 'حساب', value: 'account' })).addChannelOption(o => o.setName('القناة').setDescription('قناة عرض الأحداث المهمة').setRequired(true)).addStringOption(engineOption(false)).addStringOption(accountOption(false)))
     .addSubcommand(sc => sc.setName('قنوات').setDescription('عرض قنوات العرض الحي الحالية'))
+    .addSubcommand(sc => sc.setName('ربط-zar').setDescription('فتح نموذج ربط قناة Zar بحساب محفوظ'))
     .addSubcommand(sc => sc.setName('قناة-حذف').setDescription('إزالة قناة عرض حي').addStringOption(o => o.setName('النطاق').setDescription('النطاق المراد حذفه').setRequired(true).addChoices({ name: 'عام', value: 'general' }, { name: 'محرك', value: 'engine' }, { name: 'حساب', value: 'account' })).addStringOption(engineOption(false)).addStringOption(accountOption(false)))
     .addSubcommand(sc => sc.setName('تنظيف-سجلات').setDescription('أرشفة أو حذف سجلات قديمة')
       .addIntegerOption(o => o.setName('العمر').setDescription('أقدم من عدد أيام').setRequired(true))
@@ -128,7 +130,16 @@ module.exports = {
       const rows = [`العامة: ${settings.channels.general ? `<#${settings.channels.general}>` : 'غير محددة'}`];
       rows.push(`المحركات:\n${Object.entries(settings.channels.engines).length ? Object.entries(settings.channels.engines).map(([k, v]) => `• ${k}: <#${v}>`).join('\n') : '• لا يوجد'}`);
       rows.push(`الحسابات:\n${Object.entries(settings.channels.accounts).length ? Object.entries(settings.channels.accounts).map(([k, v]) => `• ${k}: <#${v}>`).join('\n') : '• لا يوجد'}`);
+      rows.push(`Zar:\n${Object.entries(settings.channels.zarAccounts || {}).length ? Object.entries(settings.channels.zarAccounts).map(([k, v]) => `• ${k}: <#${v}>`).join('\n') : '• لا يوجد'}`);
       return interaction.reply({ embeds: [statusEmbed('info', 'قنوات العرض الحي', rows)], ephemeral: true });
+    }
+
+    if (sub === 'ربط-zar') {
+      const modal = new Modal().setCustomId('zar-channel-modal').setTitle('ربط حساب Zar بقناة');
+      const channelId = new TextInputComponent().setCustomId('channelId').setLabel('Channel ID').setStyle('SHORT').setRequired(true);
+      const accountName = new TextInputComponent().setCustomId('accountName').setLabel('اسم الحساب من قاعدة البيانات').setStyle('SHORT').setRequired(true);
+      modal.addComponents(new MessageActionRow().addComponents(channelId), new MessageActionRow().addComponents(accountName));
+      return interaction.showModal(modal);
     }
 
     if (sub === 'قناة-حذف') {

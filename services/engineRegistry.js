@@ -22,6 +22,12 @@ const engines = [
     eventsPath: path.join(__dirname, '..', 'tokensHandler', 'Roulette', 'events'),
     defaultSettings: { delay: 0, behavior: 'auto', roundTimeout: 60 },
   },
+  {
+    id: 'zar',
+    displayName: 'زر',
+    eventsPath: path.join(__dirname, '..', 'tokensHandler', 'Zar', 'events'),
+    defaultSettings: { delay: 0, behavior: 'auto', roundTimeout: 30 },
+  },
 ];
 
 const engineMap = new Map(engines.map(engine => [engine.id, engine]));

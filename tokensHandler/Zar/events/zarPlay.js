@@ -30,61 +30,66 @@ function collectButtons(message) {
 }
 
 module.exports = {
-  name: 'messageCreate',
+  name: 'messageUpdate',
   eventType: 'game_play',
   gameName: 'زر',
-  async execute(message, client) {
-    // 1. تسجيل عند استقبال أي رسالة جديدة
-    console.log(`[ZAR-LOG] تم استقبال رسالة جديدة | معرف القناة: ${message?.channel?.id || 'غير معروف'}`);
+  async execute(oldMessage, newMessage, client) {
+    // 1. تسجيل فوري عند حدوث أي تعديل أو تحديث لرسالة داخل السيرفر
+    console.log(`[ZAR-LOG] 🟡 تم رصد تحديث (تعديل) لرسالة في القناة: ${newMessage?.channel?.id || 'غير معروف'}`);
 
-    // 2. فحص كاتب الرسالة
-    if (!message.author || !message.author.bot) {
-      console.log(`[ZAR-LOG] تم التجاهل: الرسالة ليست من بوت أو بيانات الكاتب ناقصة.`);
+    // 2. فحص وجود بيانات الكاتب وهل هو بوت
+    if (!newMessage.author) {
+      console.log(`[ZAR-LOG] ⚠️ تم التجاهل: بيانات كاتب الرسالة غائبة في هذا التحديث (Partial Message).`);
       return { handled: false };
     }
-    console.log(`[ZAR-LOG] الرسالة قادمة من بوت: ${message.author.tag}`);
 
-    // 3. فحص تطابق القناة
-    const context = client.engineContext || {};
+    if (!newMessage.author.bot) {
+      console.log(`[ZAR-LOG] ❌ تم التجاهل: الرسالة المعدلة ليست من بوت، بل من مستخدم حقيقي.`);
+      return { handled: false };
+    }
+    console.log(`[ZAR-LOG] 🤖 الرسالة المعدلة قادمة من بوت: ${newMessage.author.tag}`);
+
+    // 3. فحص تطابق القناة المخصصة للعبة
+    const context = client?.engineContext || {};
     const zarChannel = context.settings && context.settings.zarChannel;
-    if (zarChannel && zarChannel.channelId && message.channel && message.channel.id !== zarChannel.channelId) {
-      console.log(`[ZAR-LOG] تم التجاهل: الرسالة في روم أخر (${message.channel.id}) وليس روم اللعبة المبرمج (${zarChannel.channelId})`);
+    if (zarChannel && zarChannel.channelId && newMessage.channel && newMessage.channel.id !== zarChannel.channelId) {
+      console.log(`[ZAR-LOG] ❌ تم التجاهل: التحديث حصل في روم أخرى (${newMessage.channel.id}) وليس روم اللعبة المبرمجة (${zarChannel.channelId})`);
       return { handled: false };
     }
-    console.log(`[ZAR-LOG] القناة صحيحة ومطابقة لإعدادات اللعبة.`);
+    console.log(`[ZAR-LOG] 📍 القناة صحيحة ومطابقة لإعدادات اللعبة.`);
 
-    // 4. تجميع وفحص الأزرار
-    const buttons = collectButtons(message);
-    console.log(`[ZAR-LOG] عدد الأزرار المكتشفة القابلة للتفاعل: ${buttons.length}`);
+    // 4. تجميع وفحص الأزرار في الرسالة المعدلة
+    const buttons = collectButtons(newMessage);
+    console.log(`[ZAR-LOG] 🔘 عدد الأزرار المكتشفة في الرسالة المعدلة: ${buttons.length}`);
     if (buttons.length === 0) {
-      console.log(`[ZAR-LOG] تم التجاهل: لا توجد أزرار تفاعلية ونشطة في هذه الرسالة.`);
+      console.log(`[ZAR-LOG] ❌ تم التجاهل: لا توجد أزرار تفاعلية في هذه الرسالة حتى الآن.`);
       return { handled: false };
     }
 
-    // 5. فحص نص الرسالة والكلمات الدليليلة
-    const text = textFromMessage(message);
-    console.log(`[ZAR-LOG] النص المستخرج بالكامل من الرسالة: "${text}"`);
+    // 5. فحص نص الرسالة والكلمات الدليلية
+    const text = textFromMessage(newMessage);
+    console.log(`[ZAR-LOG] 📝 النص المستخرج بالكامل من الرسالة المعدلة: "${text}"`);
     
     const hasZarText = text.includes('زر') || text.toLowerCase().includes('zar') || buttons.length >= 12;
-    console.log(`[ZAR-LOG] نتيجة فحص الكلمات الدليليلة أو عدد الأزرار (>=12): ${hasZarText}`);
+    console.log(`[ZAR-LOG] 🔍 نتيجة فحص الكلمات الدليليلة أو عدد الأزرار (>=12): ${hasZarText}`);
     if (!hasZarText) {
-      console.log(`[ZAR-LOG] تم التجاهل: الرسالة لا تحتوي على كلمات اللعبة وشروطها.`);
+      console.log(`[ZAR-LOG] ❌ تم التجاهل: الرسالة المعدلة لا تخص لعبة الزر.`);
       return { handled: false };
     }
 
     // 6. تصفية الأزرار الخضراء
     const greenButtons = buttons.filter(isGreenButton);
-    console.log(`[ZAR-LOG] عدد الأزرار الخضراء المكتشفة حالياً: ${greenButtons.length}`);
+    console.log(`[ZAR-LOG] 🟢 عدد الأزرار الخضراء المكتشفة حالياً: ${greenButtons.length}`);
     if (greenButtons.length !== 1) {
-      console.log(`[ZAR-LOG] تم التجاهل: شرط الزر الأخضر الوحيد لم يتحقق (مطلوب 1، والموجود: ${greenButtons.length})`);
+      console.log(`[ZAR-LOG] ❌ تم التجاهل: شرط الزر الأخضر الوحيد لم يتحقق (مطلوب 1 زر أخضر، والموجود حالياً: ${greenButtons.length})`);
       return { handled: false };
     }
 
     // 7. مرحلة النقر التلقائي
     const targetButton = greenButtons[0];
-    console.log(`[ZAR-LOG] 🎯 تم العثور على الزر بنجاح! جاري محاولة الضغط على معرف: ${targetButton.customId}`);
+    console.log(`[ZAR-LOG] 🎯 تم رصد الزر الأخضر بنجاح! جاري محاولة الضغط على معرف: ${targetButton.customId}`);
     
-    await message.clickButton(targetButton.customId);
+    await newMessage.clickButton(targetButton.customId);
     console.log(`[ZAR-LOG] ✅ تم إرسال أمر النقر بنجاح إلى ديسكورد.`);
     
     return {

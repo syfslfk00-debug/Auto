@@ -1,3 +1,4 @@
+
 function textFromMessage(message) {
   const parts = [];
   if (message.content) parts.push(message.content);

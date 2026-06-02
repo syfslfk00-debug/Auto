@@ -6,6 +6,7 @@ const guildSettingsSchema = new mongoose.Schema({
     general: { type: String },
     engines: { type: Map, of: String, default: () => ({}) },
     accounts: { type: Map, of: String, default: () => ({}) },
+    zarAccounts: { type: Map, of: String, default: () => ({}) },
   },
   updatedAt: { type: Date, default: Date.now },
 }, { versionKey: false });

@@ -19,28 +19,52 @@ module.exports = {
       return { handled: false };
     }
 
-    // ⚠️ تعديل هام: البحث عن زر "join" ونص "اللاعبين:" بدلاً من الأزرار الرقمية
-    if (!message.components || message.components.length === 0) {
-      console.log("⏭️ لا توجد مكونات تفاعلية في الرسالة.");
+    // التحقق من محتوى النص أولاً (يحتوي على "اللاعبين:")
+    const hasLobbyText = message.content && message.content.includes("اللاعبين:");
+    if (!hasLobbyText) {
+      console.log("⏭️ الرسالة لا تحتوي على 'اللاعبين:'، تم التخطي.");
       return { handled: false };
     }
 
-    // البحث عن زر الدخول المخصص للعبة الروليت (customId === "join")
+    console.log("🎯 [نجاح] تم رصد رسالة لوبي لعبة الروليت! جاري التأكد من المكونات...");
+
+    // في حالة عدم وجود components، نحاول إعادة جلب الرسالة بعد تأخير قصير
+    if (!message.components || message.components.length === 0) {
+      console.log("⚠️ الرسالة لا تحتوي على مكونات تفاعلية حالياً، جاري إعادة جلبها...");
+      try {
+        // تأخير بسيط لإعطاء وقت لمعالجة الرسالة من قبل ديسكورد
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // إعادة جلب الرسالة من القناة
+        message = await message.channel.messages.fetch(message.id);
+        if (!message) {
+          console.log("❌ فشل جلب الرسالة بعد إعادة المحاولة.");
+          return { handled: false };
+        }
+        // التأكد مرة أخرى من وجود المكونات
+        if (!message.components || message.components.length === 0) {
+          console.log("❌ لا تزال المكونات مفقودة بعد إعادة الجلب، تخطي.");
+          return { handled: false };
+        }
+        console.log("✅ تم جلب الرسالة بنجاح مع المكونات التفاعلية.");
+      } catch (err) {
+        console.error("❌ خطأ أثناء إعادة جلب الرسالة:", err.message);
+        return { handled: false };
+      }
+    }
+
+    // البحث عن زر الدخول (join) والتأكد من أنه غير معطل
     const joinButton = message.components
       .flatMap(row => row.components)
       .find(button => button.customId === "join" && !button.disabled);
 
-    // التأكد من أن الرسالة تحتوي على "اللاعبين:" لضمان أنها لوبي الروليت
-    const hasLobbyText = message.content && message.content.includes("اللاعبين:");
-
-    if (!joinButton || !hasLobbyText) {
-      console.log("⏭️ الرسالة لا تحتوي على زر دخول نشط أو لا تحتوي 'اللاعبين:'، تم التخطي.");
+    if (!joinButton) {
+      console.log("⏭️ زر الدخول غير موجود أو معطل.");
       return { handled: false };
     }
 
-    console.log("🎯 [نجاح] تم رصد رسالة لوبي لعبة الروليت! جاري الضغط على زر الدخول...");
+    console.log("🎲 جاري الضغط على زر الدخول...");
 
-    // 🎲 الضغط على زر الدخول بعد تأخير عشوائي
+    // الضغط على زر الدخول بعد تأخير عشوائي
     return await clickWithHumanDelay(message, joinButton);
   },
 };

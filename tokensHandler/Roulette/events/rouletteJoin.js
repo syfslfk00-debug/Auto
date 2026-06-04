@@ -19,58 +19,29 @@ module.exports = {
       return { handled: false };
     }
 
-    // التأكد من أن الرسالة هي رسالة لوبي لعبة الروليت عبر وجود زر "join" (دخول)
+    // ⚠️ تعديل هام: البحث عن زر "join" ونص "اللاعبين:" بدلاً من الأزرار الرقمية
     if (!message.components || message.components.length === 0) {
       console.log("⏭️ لا توجد مكونات تفاعلية في الرسالة.");
       return { handled: false };
     }
 
     // البحث عن زر الدخول المخصص للعبة الروليت (customId === "join")
-    const hasJoinButton = message.components.some(row =>
-      row.components.some(
-        button => button.customId === "join"
-      )
-    );
+    const joinButton = message.components
+      .flatMap(row => row.components)
+      .find(button => button.customId === "join" && !button.disabled);
 
-    // تأكيد إضافي: النص يحتوي على "اللاعبين:" (حتى لا نخطئ مع رسائل أخرى)
-    const contentIncludesLobbyText = message.content && message.content.includes("اللاعبين:");
+    // التأكد من أن الرسالة تحتوي على "اللاعبين:" لضمان أنها لوبي الروليت
+    const hasLobbyText = message.content && message.content.includes("اللاعبين:");
 
-    if (!hasJoinButton || !contentIncludesLobbyText) {
-      console.log("⏭️ الرسالة لا تحتوي على زر الدخول (join) أو لا تحتوي 'اللاعبين:'، تم التخطي.");
+    if (!joinButton || !hasLobbyText) {
+      console.log("⏭️ الرسالة لا تحتوي على زر دخول نشط أو لا تحتوي 'اللاعبين:'، تم التخطي.");
       return { handled: false };
     }
 
-    console.log("🎯 [نجاح] تم رصد رسالة لوبي لعبة الروليت! جاري فرز الخانات الشاغرة...");
+    console.log("🎯 [نجاح] تم رصد رسالة لوبي لعبة الروليت! جاري الضغط على زر الدخول...");
 
-    // تسطيح جميع الأزرار من كافة الصفوف في مصفوفة واحدة
-    const allButtons = message.components.flatMap(row => row.components);
-
-    // تجميع الأزرار المتاحة (الخانات غير المحجوزة) واستبعاد الأزرار غير المناسبة
-    const availableButtons = allButtons.filter(button => {
-      if (button.disabled) return false;
-      // استبعاد زر الخروج صراحة (customId === "exit")
-      if (button.customId === "exit") return false;
-      const label = button.label || '';
-      // استبعاد أزرار التحكم الخاطئة
-      if (label.includes('اخرج') || label.includes('متجر')) return false;
-      return true;
-    });
-
-    if (availableButtons.length === 0) {
-      console.log("❌ لم يتم العثور على أي زر دخول شاغر (اللوبي ممتلئ بالكامل).");
-      return { handled: false };
-    }
-
-    console.log(`📊 عدد أزرار الدخول الشاغرة المتاحة حالياً: ${availableButtons.length} زر.`);
-
-    // 🎲 التمويه العشوائي: اختيار زر عشوائي تماماً من قائمة الأزرار المتاحة
-    const randomIndex = Math.floor(Math.random() * availableButtons.length);
-    const targetButton = availableButtons[randomIndex];
-
-    console.log(`🎲 نظام الحماية اختار لك الرقم: [${targetButton.label}] بشكل عشوائي.`);
-
-    // استدعاء دالة الضغط التلقائي مع التأخير البشري المتغير
-    return await clickWithHumanDelay(message, targetButton);
+    // 🎲 الضغط على زر الدخول بعد تأخير عشوائي
+    return await clickWithHumanDelay(message, joinButton);
   },
 };
 
@@ -88,16 +59,16 @@ async function clickWithHumanDelay(message, button) {
   try {
     // إرسال الضغطة إلى ديسكورد
     await message.clickButton(button.customId);
-    console.log(`🚀 [ممتاز] تم حجز الرقم [${button.label}] والدخول إلى اللعبة بنجاح تمويهي كامل!`);
+    console.log(`🚀 [ممتاز] تم الدخول إلى لعبة الروليت بنجاح تمويهي كامل!`);
     return {
       handled: true,
       type: 'game_join',
       result: 'join',
       gameName: 'روليت',
-      message: `تم الدخول عشوائياً بالرقم: ${button.label}`,
+      message: `تم الدخول إلى لعبة الروليت بنجاح.`,
     };
   } catch (error) {
-    console.error("❌ فشلت محاولة الضغط العشوائي، السبب:", error.message);
+    console.error("❌ فشلت محاولة الضغط على زر الدخول، السبب:", error.message);
     return { handled: false };
   }
 }
